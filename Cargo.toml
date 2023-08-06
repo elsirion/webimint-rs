@@ -1,0 +1,30 @@
+[package]
+name = "fedimint-leptos-test"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+async-trait = "0.1.68"
+anyhow = "1.0.71"
+fedimint-client = { git = "https://github.com/fedimint/fedimint", rev = "eac48909a24a0558d78f8e32d8c15ff955e257ba" }
+fedimint-core = { git = "https://github.com/fedimint/fedimint", rev = "eac48909a24a0558d78f8e32d8c15ff955e257ba" }
+futures = "0.3.28"
+hex = "0.4.3"
+leptos = { version = "0.3.1", features = [ "stable" ] }
+
+console_error_panic_hook = "0.1.7"
+tracing = "0.1.37"
+tracing-wasm = "0.2.1"
+
+tokio = { version = "1.28.2", features = [ "rt", "sync", "time" ] }
+tokio-stream = "0.1.14"
+wasm-bindgen = "0.2.87"
+wasm-bindgen-futures = "0.4.37"
+
+rexie = "0.4.2"
+
+[patch.crates-io]
+secp256k1-zkp = { git = "https://github.com/dpc/rust-secp256k1-zkp/", branch = "sanket-pr" }
+ring = { git = "https://github.com/dpc/ring", rev = "5493e7e76d0d8fb1d3cbb0be9c4944700741b802" }
