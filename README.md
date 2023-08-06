@@ -25,4 +25,6 @@ fedimint-leptos-test$ trunk serve
 2023-08-06T12:00:42.919899Z  INFO 📡 server listening at http://127.0.0.1:8080
 ```
 
-You should see "Starting client" in the browser and the JS console should be logging a lot.
+You should see "Starting client" in the browser and the JS console should be logging a lot:
+
+![Screenshot of config fetching failing](screenshot.png)
