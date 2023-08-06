@@ -12,7 +12,7 @@ fedimint-client = { git = "https://github.com/fedimint/fedimint", rev = "eac4890
 fedimint-core = { git = "https://github.com/fedimint/fedimint", rev = "eac48909a24a0558d78f8e32d8c15ff955e257ba" }
 futures = "0.3.28"
 hex = "0.4.3"
-leptos = { version = "0.3.1", features = [ "stable" ] }
+leptos = { version = "0.4.8", features = ["csr"] }
 
 console_error_panic_hook = "0.1.7"
 tracing = "0.1.37"
