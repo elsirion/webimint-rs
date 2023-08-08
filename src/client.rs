@@ -7,6 +7,7 @@ use fedimint_core::util::BoxStream;
 use fedimint_core::Amount;
 use fedimint_ln_client::LightningClientGen;
 use fedimint_mint_client::MintClientGen;
+use fedimint_mint_client::{parse_ecash, MintClientExt};
 use fedimint_wallet_client::WalletClientGen;
 use leptos::warn;
 use std::fmt::{Debug, Formatter};
@@ -19,12 +20,14 @@ enum RpcRequest {
     Join(String),
     GetName,
     SubscribeBalance,
+    Receive(String),
 }
 
 enum RpcResponse {
     Join,
     GetName(String),
     SubscribeBalance(BoxStream<'static, Amount>),
+    Receive(Amount),
 }
 
 impl Debug for RpcResponse {
@@ -109,6 +112,16 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
                     .send(Ok(RpcResponse::SubscribeBalance(stream)))
                     .map_err(|_| warn!("RPC receiver dropped before response was sent"));
             }
+            RpcRequest::Receive(notes) => {
+                let notes = notes.trim();
+                info!("Receiving notes: \"{notes}\"");
+                let notes = parse_ecash(notes).unwrap();
+                let amount = notes.total_amount();
+                client.reissue_external_notes(notes, ()).await.unwrap();
+                let _ = response_sender
+                    .send(Ok(RpcResponse::Receive(amount)))
+                    .map_err(|_| warn!("RPC receiver dropped before response was sent"));
+            }
             req => {
                 let _ = response_sender
                     .send(Err(anyhow::anyhow!("Invalid request: {req:?}")))
@@ -167,6 +180,19 @@ impl ClientRpc {
         let response = response_receiver.await.expect("Client has stopped")?;
         match response {
             RpcResponse::SubscribeBalance(stream) => Ok(stream),
+            _ => Err(anyhow::anyhow!("Invalid response")),
+        }
+    }
+
+    pub async fn receive(&self, invoice: String) -> anyhow::Result<Amount> {
+        let (response_sender, response_receiver) = oneshot::channel();
+        self.sender
+            .send((RpcRequest::Receive(invoice), response_sender))
+            .await
+            .expect("Client has stopped");
+        let response = response_receiver.await.expect("Client has stopped")?;
+        match response {
+            RpcResponse::Receive(amount) => Ok(amount),
             _ => Err(anyhow::anyhow!("Invalid response")),
         }
     }
