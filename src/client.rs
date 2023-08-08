@@ -1,10 +1,15 @@
 use fedimint_client::secret::PlainRootSecretStrategy;
+use fedimint_client::Client;
 use fedimint_core::api::InviteCode;
 use fedimint_core::db::mem_impl::MemDatabase;
 use fedimint_core::task::TaskGroup;
+use fedimint_core::util::BoxStream;
+use fedimint_core::Amount;
 use fedimint_ln_client::LightningClientGen;
 use fedimint_mint_client::MintClientGen;
 use fedimint_wallet_client::WalletClientGen;
+use leptos::warn;
+use std::fmt::{Debug, Formatter};
 use std::str::FromStr;
 use tokio::sync::{mpsc, oneshot};
 use tracing::{debug, info};
@@ -13,12 +18,19 @@ use tracing::{debug, info};
 enum RpcRequest {
     Join(String),
     GetName,
+    SubscribeBalance,
 }
 
-#[derive(Debug, Clone)]
 enum RpcResponse {
     Join,
     GetName(String),
+    SubscribeBalance(BoxStream<'static, Amount>),
+}
+
+impl Debug for RpcResponse {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "RpcResponse::?")
+    }
 }
 
 type RpcCall = (RpcRequest, oneshot::Sender<anyhow::Result<RpcResponse>>);
@@ -31,21 +43,23 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
                 (invite_code_str, response_sender)
             }
             (_, response_sender) => {
-                response_sender
+                let _ = response_sender
                     .send(Err(anyhow::anyhow!(
                         "Invalid request, need to initialize client first"
                     )))
-                    .unwrap();
+                    .map_err(|_| warn!("RPC receiver dropped before response was sent"));
                 continue;
             }
         };
 
+        info!("Joining federation {}", invite_code_str);
+
         let invite_code = match InviteCode::from_str(&invite_code_str) {
             Ok(invite) => invite,
             Err(e) => {
-                response_sender
+                let _ = response_sender
                     .send(Err(anyhow::anyhow!("Invalid invite code: {e:?}")))
-                    .unwrap();
+                    .map_err(|_| warn!("RPC receiver dropped before response was sent"));
                 continue;
             }
         };
@@ -62,19 +76,21 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
 
         match client_res {
             Ok(client) => {
-                response_sender
+                let _ = response_sender
                     .send(Ok(RpcResponse::Join))
-                    .expect("RPC receiver not dropped");
+                    .map_err(|_| warn!("RPC receiver dropped before response was sent"));
                 break client;
             }
             Err(e) => {
-                response_sender
+                let _ = response_sender
                     .send(Err(anyhow::anyhow!("Failed to initialize client: {e:?}")))
-                    .unwrap();
+                    .map_err(|_| warn!("RPC receiver dropped before response was sent"));
                 continue;
             }
         };
     };
+
+    let client: &Client = Box::leak(Box::new(client));
 
     while let Some((rpc_request, response_sender)) = rpc.recv().await {
         debug!("Received RPC request: {:?}", rpc_request);
@@ -83,13 +99,21 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
                 let name = client
                     .get_meta("federation_name")
                     .unwrap_or("<unknown>".to_string());
-                response_sender
+                let _ = response_sender
                     .send(Ok(RpcResponse::GetName(name)))
-                    .unwrap();
+                    .map_err(|_| warn!("RPC receiver dropped before response was sent"));
             }
-            req => response_sender
-                .send(Err(anyhow::anyhow!("Invalid request: {req:?}")))
-                .unwrap(),
+            RpcRequest::SubscribeBalance => {
+                let stream = client.subscribe_balance_changes().await;
+                let _ = response_sender
+                    .send(Ok(RpcResponse::SubscribeBalance(stream)))
+                    .map_err(|_| warn!("RPC receiver dropped before response was sent"));
+            }
+            req => {
+                let _ = response_sender
+                    .send(Err(anyhow::anyhow!("Invalid request: {req:?}")))
+                    .map_err(|_| warn!("RPC receiver dropped before response was sent"));
+            }
         }
     }
 
@@ -112,7 +136,8 @@ impl ClientRpc {
         let (response_sender, response_receiver) = oneshot::channel();
         self.sender
             .send((RpcRequest::Join(invite), response_sender))
-            .await?;
+            .await
+            .expect("Client has stopped");
         let response = response_receiver.await.expect("Client has stopped")?;
         match response {
             RpcResponse::Join => Ok(()),
@@ -124,10 +149,24 @@ impl ClientRpc {
         let (response_sender, response_receiver) = oneshot::channel();
         self.sender
             .send((RpcRequest::GetName, response_sender))
-            .await?;
+            .await
+            .expect("Client has stopped");
         let response = response_receiver.await.expect("Client has stopped")?;
         match response {
             RpcResponse::GetName(name) => Ok(name),
+            _ => Err(anyhow::anyhow!("Invalid response")),
+        }
+    }
+
+    pub async fn subscribe_balance(&self) -> anyhow::Result<BoxStream<'static, Amount>> {
+        let (response_sender, response_receiver) = oneshot::channel();
+        self.sender
+            .send((RpcRequest::SubscribeBalance, response_sender))
+            .await
+            .expect("Client has stopped");
+        let response = response_receiver.await.expect("Client has stopped")?;
+        match response {
+            RpcResponse::SubscribeBalance(stream) => Ok(stream),
             _ => Err(anyhow::anyhow!("Invalid response")),
         }
     }
