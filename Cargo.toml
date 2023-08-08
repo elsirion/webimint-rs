@@ -13,6 +13,9 @@ async-trait = "0.1.68"
 anyhow = "1.0.71"
 fedimint-client = { git = "https://github.com/fedimint/fedimint", rev = "eac48909a24a0558d78f8e32d8c15ff955e257ba" }
 fedimint-core = { git = "https://github.com/fedimint/fedimint", rev = "eac48909a24a0558d78f8e32d8c15ff955e257ba" }
+fedimint-wallet-client = { git = "https://github.com/fedimint/fedimint", rev = "eac48909a24a0558d78f8e32d8c15ff955e257ba" }
+fedimint-mint-client = { git = "https://github.com/fedimint/fedimint", rev = "eac48909a24a0558d78f8e32d8c15ff955e257ba" }
+fedimint-ln-client = { git = "https://github.com/fedimint/fedimint", rev = "eac48909a24a0558d78f8e32d8c15ff955e257ba" }
 futures = "0.3.28"
 hex = "0.4.3"
 leptos = { version = "0.4.8", features = ["csr"] }
