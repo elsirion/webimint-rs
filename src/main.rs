@@ -2,6 +2,7 @@ mod client;
 mod db;
 
 use crate::client::ClientRpc;
+use fedimint_core::Amount;
 use leptos::ev::SubmitEvent;
 use leptos::html::Input;
 use leptos::*;
@@ -17,6 +18,7 @@ pub fn main() {
             create_signal(cx, "Waiting to join federation".to_string());
 
         let (joined_signal, joined_sender) = create_signal(cx, None);
+        let (balance_signal, balance_sender) = create_signal(cx, None);
 
         let invite_code_element: NodeRef<Input> = create_node_ref(cx);
         let on_submit = move |ev: SubmitEvent| {
@@ -34,6 +36,10 @@ pub fn main() {
                 let name = client.get_name().await.unwrap();
                 info_sender.set(format!("Joined federation {name}"));
                 joined_sender.set(Some(name));
+
+                let balance_subscription = client.subscribe_balance().await.unwrap();
+                let balance_stream_signal = create_signal_from_stream(cx, balance_subscription);
+                balance_sender.set(Some(balance_stream_signal));
             });
         };
 
@@ -49,15 +55,24 @@ pub fn main() {
                     type="submit"
                     value="Join Federation"
                 />
-                {
-                    move || match joined_signal.get() {
-                        None => view! { cx, <p>"Loading..."</p> }.into_view(cx),
-                        Some(name) => {
-                            view! { cx, <p>"Joined " {name}</p> }.into_view(cx)
-                        }
+            </form>
+            {
+                move || match joined_signal.get() {
+                    None => view! { cx, <p>"Loading..."</p> }.into_view(cx),
+                    Some(name) => {
+                        view! { cx, <p>"Joined " {name}</p> }.into_view(cx)
                     }
                 }
-            </form>
+            }
+            {
+                move || match balance_signal.get() {
+                    None => view! { cx, <p>"Balance: 0 msat"</p> }.into_view(cx),
+                    Some(balance) => {
+                        let current_balance = balance.get().unwrap_or(Amount::ZERO).msats;
+                        view! { cx, <p>"Balance " {current_balance} " msat"</p> }.into_view(cx)
+                    }
+                }
+            }
         }
     });
 }
