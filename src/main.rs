@@ -63,6 +63,22 @@ pub fn main() {
             });
         };
 
+        let client_ln_send = client.clone();
+        let ln_send_element: NodeRef<Input> = create_node_ref(cx);
+        let on_submit_ln_send = move |ev: SubmitEvent| {
+            // stop the page from reloading!
+            ev.prevent_default();
+
+            let invoice = ln_send_element.get().expect("<input> to exist").value();
+            info_sender.set(format!("Payin LN invoice {}", invoice));
+            let client = client_ln_send.clone();
+            spawn_local(async move {
+                if let Err(e) = client.ln_send(invoice).await {
+                    info_sender.set(format!("LN send failed: {e:?}"));
+                };
+            });
+        };
+
         view! { cx,
             <p>"Status: " {info_signal}</p>
             <form on:submit=on_submit>
@@ -102,6 +118,17 @@ pub fn main() {
                 <input
                     type="submit"
                     value="Redeem e-cash"
+                />
+            </form>
+            <form on:submit=on_submit_ln_send>
+                <input
+                    type="text"
+                    placeholder="LN invoice, i.e. lnbcrt1p0…"
+                    node_ref=ln_send_element
+                />
+                <input
+                    type="submit"
+                    value="Pay LN invoice"
                 />
             </form>
         }
