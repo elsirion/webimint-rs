@@ -101,12 +101,12 @@ pub fn main() {
                 }
             }
             {
-                move || match balance_signal.get() {
-                    None => view! { cx, <p>"Balance: 0 msat"</p> }.into_view(cx),
-                    Some(balance) => {
-                        let current_balance = balance.get().unwrap_or(Amount::ZERO).msats;
-                        view! { cx, <p>"Balance " {current_balance} " msat"</p> }.into_view(cx)
-                    }
+                move || {
+                    let balance = balance_signal.get()
+                        .and_then(|balance| balance.get())
+                        .unwrap_or(Amount::ZERO)
+                        .msats;
+                    view! { cx, <p>"Balance: " {balance} " msat"</p> }.into_view(cx)
                 }
             }
             <form on:submit=on_submit_ecash>
