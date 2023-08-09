@@ -62,13 +62,12 @@ fn App(cx: Scope) -> impl IntoView {
     //
     // join
     //
-
     let (invite_code, set_invite_code) = create_signal::<Option<String>>(cx, None);
 
     let client_submit = client.clone();
 
     // TODO: Proper error handling, return an `anyhow::Result` instead of Option<String>
-    let join_resource = create_resource_with_initial_value(
+    let join_resource: Resource<Option<String>, Option<()>> = create_resource_with_initial_value(
         cx,
         move || invite_code.get(),
         move |value| async move {
@@ -108,9 +107,7 @@ fn App(cx: Scope) -> impl IntoView {
         set_invite_code.set(Some(invite));
     };
 
-    // Joined REssource: Option(Option<String> (Option<Result<String, RpcError>>) or something would be better)
     let joined = move || join_resource.read(cx).flatten().is_some();
-    // let derived_signal_double_count = move || count() * 2;
 
     // Update info depending on joined state
     create_effect(cx, move |_| {
@@ -170,17 +167,13 @@ fn Balance(cx: Scope) -> impl IntoView {
 }
 
 //
-// SendEcash component
+// ReceiveEcash component
 //
 #[component]
 fn ReceiveEcash(cx: Scope, set_info: WriteSignal<String>) -> impl IntoView {
     provide_app_context(cx);
 
     let AppContext { client, .. } = expect_context::<AppContext>(cx);
-
-    //
-    // e-cash
-    //
 
     let (ecash_receive, set_ecash_receive) = create_signal::<Option<String>>(cx, None);
     let ecash_receive_element: NodeRef<Input> = create_node_ref(cx);
@@ -246,17 +239,13 @@ fn ReceiveEcash(cx: Scope, set_info: WriteSignal<String>) -> impl IntoView {
 }
 
 //
-// ReceiveLN component
+// SendLN component
 //
 #[component]
 fn SendLN(cx: Scope, set_info: WriteSignal<String>) -> impl IntoView {
     provide_app_context(cx);
 
     let AppContext { client, .. } = expect_context::<AppContext>(cx);
-
-    //
-    // ln send
-    //
 
     let (ln_send, set_ln_send) = create_signal::<Option<String>>(cx, None);
     let ln_send_element: NodeRef<Input> = create_node_ref(cx);
