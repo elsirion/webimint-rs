@@ -3,7 +3,7 @@
 # Fedimint Client built with [Leptos](https://github.com/leptos-rs/leptos)
 
 This repo contains a proof-of-concept of how to integrate `fedimint-client` with the Leptos web framework to build a
-PWA. Nothing really works yet but it compiles.
+PWA. There are still some bugs being worked out, but there is a demo available at https://fedimint-leptos.sirion.io/.
 
 ## (Temporary) Pre-requirements (will be changed for sure)
 
