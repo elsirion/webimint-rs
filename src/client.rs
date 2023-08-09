@@ -5,11 +5,12 @@ use fedimint_core::db::mem_impl::MemDatabase;
 use fedimint_core::task::TaskGroup;
 use fedimint_core::util::BoxStream;
 use fedimint_core::Amount;
-use fedimint_ln_client::LightningClientGen;
+use fedimint_ln_client::{LightningClientExt, LightningClientGen};
 use fedimint_mint_client::MintClientGen;
 use fedimint_mint_client::{parse_ecash, MintClientExt};
 use fedimint_wallet_client::WalletClientGen;
 use leptos::warn;
+use lightning_invoice::Invoice;
 use std::fmt::{Debug, Formatter};
 use std::str::FromStr;
 use tokio::sync::{mpsc, oneshot};
@@ -21,6 +22,7 @@ enum RpcRequest {
     GetName,
     SubscribeBalance,
     Receive(String),
+    LnSend(String),
 }
 
 enum RpcResponse {
@@ -28,6 +30,7 @@ enum RpcResponse {
     GetName(String),
     SubscribeBalance(BoxStream<'static, Amount>),
     Receive(Amount),
+    LnSend,
 }
 
 impl Debug for RpcResponse {
@@ -122,6 +125,26 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
                     .send(Ok(RpcResponse::Receive(amount)))
                     .map_err(|_| warn!("RPC receiver dropped before response was sent"));
             }
+            RpcRequest::LnSend(invoice) => {
+                let invoice = match Invoice::from_str(&invoice) {
+                    Ok(invoice) => invoice,
+                    Err(e) => {
+                        let _ = response_sender
+                            .send(Err(anyhow::anyhow!("Invalid invoice: {e:?}")))
+                            .map_err(|_| warn!("RPC receiver dropped before response was sent"));
+                        continue;
+                    }
+                };
+
+                let _ = response_sender
+                    .send(
+                        client
+                            .pay_bolt11_invoice(invoice)
+                            .await
+                            .map(|_| RpcResponse::LnSend),
+                    )
+                    .map_err(|_| warn!("RPC receiver dropped before response was sent"));
+            }
             req => {
                 let _ = response_sender
                     .send(Err(anyhow::anyhow!("Invalid request: {req:?}")))
@@ -193,6 +216,19 @@ impl ClientRpc {
         let response = response_receiver.await.expect("Client has stopped")?;
         match response {
             RpcResponse::Receive(amount) => Ok(amount),
+            _ => Err(anyhow::anyhow!("Invalid response")),
+        }
+    }
+
+    pub async fn ln_send(&self, invoice: String) -> anyhow::Result<()> {
+        let (response_sender, response_receiver) = oneshot::channel();
+        self.sender
+            .send((RpcRequest::LnSend(invoice), response_sender))
+            .await
+            .expect("Client has stopped");
+        let response = response_receiver.await.expect("Client has stopped")?;
+        match response {
+            RpcResponse::LnSend => Ok(()),
             _ => Err(anyhow::anyhow!("Invalid response")),
         }
     }

@@ -716,6 +716,7 @@ dependencies = [
  "futures",
  "hex",
  "leptos",
+ "lightning-invoice",
  "rexie",
  "tokio",
  "tokio-stream",
