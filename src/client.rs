@@ -1,3 +1,4 @@
+use anyhow;
 use fedimint_client::secret::PlainRootSecretStrategy;
 use fedimint_client::Client;
 use fedimint_core::api::InviteCode;
@@ -11,8 +12,10 @@ use fedimint_mint_client::{parse_ecash, MintClientExt};
 use fedimint_wallet_client::WalletClientGen;
 use leptos::warn;
 use lightning_invoice::Invoice;
+use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
 use std::str::FromStr;
+use thiserror::Error as ThisError;
 use tokio::sync::{mpsc, oneshot};
 use tracing::{debug, info};
 
@@ -36,6 +39,20 @@ enum RpcResponse {
 impl Debug for RpcResponse {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "RpcResponse::?")
+    }
+}
+
+#[derive(Debug, ThisError, Serialize, Deserialize, Clone)]
+pub enum RpcError {
+    #[error("Invalid response")]
+    InvalidResponse,
+    #[error("Client stopped")]
+    ClientStopped(String),
+}
+
+impl From<anyhow::Error> for RpcError {
+    fn from(e: anyhow::Error) -> Self {
+        Self::ClientStopped(e.to_string())
     }
 }
 
@@ -181,7 +198,7 @@ impl ClientRpc {
         }
     }
 
-    pub async fn get_name(&self) -> anyhow::Result<String> {
+    pub async fn get_name(&self) -> anyhow::Result<String, RpcError> {
         let (response_sender, response_receiver) = oneshot::channel();
         self.sender
             .send((RpcRequest::GetName, response_sender))
@@ -190,7 +207,7 @@ impl ClientRpc {
         let response = response_receiver.await.expect("Client has stopped")?;
         match response {
             RpcResponse::GetName(name) => Ok(name),
-            _ => Err(anyhow::anyhow!("Invalid response")),
+            _ => Err(RpcError::InvalidResponse),
         }
     }
 
@@ -207,7 +224,7 @@ impl ClientRpc {
         }
     }
 
-    pub async fn receive(&self, invoice: String) -> anyhow::Result<Amount> {
+    pub async fn receive(&self, invoice: String) -> anyhow::Result<Amount, RpcError> {
         let (response_sender, response_receiver) = oneshot::channel();
         self.sender
             .send((RpcRequest::Receive(invoice), response_sender))
@@ -216,7 +233,7 @@ impl ClientRpc {
         let response = response_receiver.await.expect("Client has stopped")?;
         match response {
             RpcResponse::Receive(amount) => Ok(amount),
-            _ => Err(anyhow::anyhow!("Invalid response")),
+            _ => Err(RpcError::InvalidResponse),
         }
     }
 

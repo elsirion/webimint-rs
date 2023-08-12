@@ -1,11 +1,11 @@
 mod client;
 mod db;
 
+use fedimint_core::task::sleep;
 use futures::stream::StreamExt;
-use tracing::warn;
+use tracing::trace;
 
 use crate::client::ClientRpc;
-use fedimint_core::task::sleep;
 use fedimint_core::Amount;
 use leptos::ev::SubmitEvent;
 use leptos::html::Input;
@@ -26,63 +26,81 @@ pub fn main() {
 #[derive(Clone)]
 pub(crate) struct AppContext {
     pub client: StoredValue<ClientRpc>,
-    pub client_r: ReadSignal<Option<ClientRpc>>,
-    pub client_w: WriteSignal<Option<ClientRpc>>,
     pub balance: ReadSignal<Amount>,
-    pub name: ReadSignal<Option<String>>,
+    pub send_invoice: WriteSignal<Option<String>>,
 }
 
-// TODO: tracing lib
-
-pub fn provide_app_context(cx: Scope) {
-    let client = store_value(cx, ClientRpc::new());
-
-    let (client_r, client_w) = create_signal::<Option<ClientRpc>>(cx, None);
-
-    let (name, set_name) = create_signal::<Option<String>>(cx, None);
-
-    create_effect(cx, move |_| async move {
-        if let Some(client) = client_r.get() {
-            let name = client.get_name().await.unwrap();
-            set_name.set(Some(name.clone()));
-        };
-    });
+pub fn provide_app_context(cx: Scope, client: ClientRpc) {
+    let client = store_value(cx, client);
+    let (send_invoice, set_send_invoice) = create_signal::<Option<String>>(cx, None);
 
     let (balance, set_balance) = create_signal(cx, Amount::ZERO);
-    create_effect(cx, move |_| async move {
-        if let Some(client) = client_r.get() {
-            log!("create effect client");
-            wasm_bindgen_futures::spawn_local(async move {
-                let mut update_b_stream = loop {
-                    let balance_res = client.clone().subscribe_balance().await;
 
-                    match balance_res {
-                        Ok(balance) => {
-                            break balance;
-                        }
-                        Err(e) => {
-                            warn!("client could not get balance: {e:?}");
-                            sleep(std::time::Duration::from_secs(1)).await;
-                        }
-                    }
-                };
+    wasm_bindgen_futures::spawn_local(async move {
+        let mut balance_stream = loop {
+            // log!("balance_stream");
+            let balance_res = client.get_value().subscribe_balance().await;
 
-                while let Some(amount) = update_b_stream.next().await {
-                    log!("balance update: {}", amount.msats);
-                    set_balance.set(amount);
+            match balance_res {
+                Ok(balance) => {
+                    log!("balance_stream OK");
+                    break balance;
                 }
-            });
+                Err(e) => {
+                    warn!("client could not get balance: {e:?}");
+                    sleep(std::time::Duration::from_secs(1)).await;
+                }
+            }
         };
+
+        while let Some(amount) = balance_stream.next().await {
+            log!("balance stream update: {}", amount.msats);
+            set_balance.set(amount);
+        }
     });
+
+    // let _ = create_resource_with_initial_value(
+    //     cx,
+    //     move || send_invoice.get(),
+    //     move |value| async move {
+    //         log!("ln_send_resource {:?}", value);
+
+    //         match value {
+    //             None => {
+    //                 log!("no send value");
+    //                 return None;
+    //             }
+    //             Some(value) => {
+    //                 log!("calling send");
+
+    //                 if let Err(_) = client.get_value().ln_send(value).await {
+    //                     return None;
+    //                 };
+
+    //                 return Some(());
+    //             }
+    //         }
+    //     },
+    //     None,
+    // );
 
     let context = AppContext {
         client,
         balance,
-        client_r,
-        client_w,
-        name,
+        send_invoice: set_send_invoice,
     };
 
+    provide_context(cx, context);
+}
+
+#[derive(Clone)]
+pub(crate) struct TestContext {
+    pub name: Option<String>,
+}
+
+pub fn provide_test_context(cx: Scope, name: String) {
+    trace!("provide_test_context");
+    let context = TestContext { name: Some(name) };
     provide_context(cx, context);
 }
 
@@ -91,49 +109,16 @@ pub fn provide_app_context(cx: Scope) {
 //
 #[component]
 fn App(cx: Scope) -> impl IntoView {
-    provide_app_context(cx);
-
-    let AppContext {
-        client_w: c_w,
-        name,
-        ..
-    } = expect_context::<AppContext>(cx);
-
-    let (info, set_info) = create_signal(cx, "".to_string());
-
-    //
-    // join
-    //
-    let (invite_code, set_invite_code) = create_signal::<Option<String>>(cx, None);
-
-    // let client_submit = client.clone();
-
-    // TODO: Proper error handling, return an `anyhow::Result` instead of Option<String>
-    let join_resource: Resource<Option<String>, Option<()>> = create_resource_with_initial_value(
-        cx,
-        move || invite_code.get(),
-        move |value| async move {
-            log!("join_resource {value:?}");
-
-            match value {
-                None => {
-                    log!("no invite code");
-                    return None;
-                }
-                Some(value) => {
-                    log!("calling join");
-                    let c = ClientRpc::new();
-                    // let c = c.get_value();
-                    // TODO: Error handling
-                    _ = c.join(value).await;
-                    c_w.set(Some(c.clone()));
-
-                    return Some(());
-                }
-            }
-        },
-        None,
-    );
+    async fn join_request(invite: String) -> ClientRpc {
+        let client = ClientRpc::new();
+        // TODO: Handle result
+        _ = client.join(invite).await;
+        client
+    }
+    let join_action = create_action(cx, |invoice: &String| {
+        let invoice = invoice.clone();
+        join_request(invoice)
+    });
 
     let invite_code_element: NodeRef<Input> = create_node_ref(cx);
 
@@ -143,29 +128,12 @@ fn App(cx: Scope) -> impl IntoView {
 
         let invite = invite_code_element.get().expect("<input> to exist").value();
         // Trigger `join_resource` by updating invite code
-        set_invite_code.set(Some(invite));
+        join_action.dispatch(invite);
     };
 
-    let joined = move || join_resource.read(cx).flatten().is_some();
-
-    // Update info depending on joined state
-    create_effect(cx, move |_| {
-        if join_resource.loading().get() {
-            set_info.set("Joining Federation... (pls wait)".to_string());
-        } else {
-            if joined() {
-                set_info.set(format!(
-                    "Joined {}",
-                    name.get().unwrap_or("unknown".to_string())
-                ));
-            } else {
-                set_info.set("Waiting to join federation...".to_string());
-            }
-        }
-    });
+    let joined = move || join_action.value().get().is_some();
 
     view! { cx,
-      <p>"Status: " {info}</p>
       <form on:submit=on_submit_join>
           // TODO: Validate invite code. Listen to `on:change`
           <input
@@ -181,16 +149,60 @@ fn App(cx: Scope) -> impl IntoView {
           />
       </form>
 
-      <Show
-        when=joined
-        fallback=|_| view! { cx,
-          <></>
+
+      <Show when=move || join_action.pending().get()
+        fallback=|_| view! { cx, "" }
+        >
+        <p>"Joining ..."</p>
+      </Show>
+
+      <Suspense
+        fallback=move || view! { cx,
+          <p>"Loading..."</p>
         }
       >
-        <Balance />
-        <ReceiveEcash set_info />
-        <SendLN set_info />
-      </Show>
+      { move || {
+        join_action.value().get().map(|c| {
+          // Create app context to provide ClientRpc
+          // as soon as it's available
+          provide_app_context(cx, c);
+
+          let AppContext {client, ..} = expect_context::<AppContext>(cx);
+
+          // get name of the federation
+          let name_resource = create_resource(
+            cx,
+            || (),
+            move |_| async move {
+                client.get_value().get_name().await
+            },
+          );
+
+        let federation_label = move || {
+          name_resource
+              .read(cx)
+              .map(|value|
+                {
+                  match value {
+                    Err(error) => format!("Failed to get federation name {error:?}"),
+                    Ok(value) => format!("Joined {value:?}")
+                  }
+                })
+              // This loading state will only show before the first load
+              .unwrap_or_else(|| "Loading...".into())
+      };
+
+          // provide_test_context(cx, "world".to_string());
+          // let TestContext {name, ..} = expect_context::<TestContext>(cx);
+          view! { cx,
+            <p>{federation_label}</p>
+            <Balance />
+            <ReceiveEcash />
+            // <SendLN />
+          }
+        })
+      }}
+      </Suspense>
 
     }
 }
@@ -198,33 +210,31 @@ fn App(cx: Scope) -> impl IntoView {
 //
 // Balance component
 //
+
 #[component]
 fn Balance(cx: Scope) -> impl IntoView {
     let AppContext { balance, .. } = expect_context::<AppContext>(cx);
 
+    let balance_text = move || format! {"{:?} msat", balance.get().msats};
+
     view! { cx,
-    <p>"Balance: " {move || balance.get().msats} " msat"</p> }
-    .into_view(cx)
+      <p>"Balance: " {balance_text}</p>
+    }
 }
 
 //
 // ReceiveEcash component
 //
 #[component]
-fn ReceiveEcash(cx: Scope, set_info: WriteSignal<String>) -> impl IntoView {
-    let AppContext { client_r, .. } = expect_context::<AppContext>(cx);
+fn ReceiveEcash(cx: Scope) -> impl IntoView {
+    let AppContext { client, .. } = expect_context::<AppContext>(cx);
 
-    let (ecash_receive, set_ecash_receive) = create_signal::<Option<String>>(cx, None);
-    let ecash_receive_element: NodeRef<Input> = create_node_ref(cx);
+    let (receive_value, set_receive_value) = create_signal::<Option<String>>(cx, None);
 
-    let client_receive = client_r.clone();
-
-    let _ecash_receive_resource = create_resource_with_initial_value(
+    let _ = create_resource(
         cx,
-        move || ecash_receive.get(),
+        move || receive_value.get(),
         move |value| async move {
-            log!("ecash_resource {:?}", value);
-
             match value {
                 None => {
                     log!("no receive value");
@@ -233,10 +243,7 @@ fn ReceiveEcash(cx: Scope, set_info: WriteSignal<String>) -> impl IntoView {
                 Some(value) => {
                     log!("calling receive");
 
-                    let c = client_receive.get().expect("client to exist");
-
-                    if let Err(e) = c.receive(value).await {
-                        set_info.set(format!("Receive ecash failed: {e:?}"));
+                    if let Err(_) = client.get_value().receive(value).await {
                         return None;
                     };
 
@@ -244,8 +251,9 @@ fn ReceiveEcash(cx: Scope, set_info: WriteSignal<String>) -> impl IntoView {
                 }
             }
         },
-        None,
     );
+
+    let ecash_receive_element: NodeRef<Input> = create_node_ref(cx);
 
     let on_submit_ecash = move |ev: SubmitEvent| {
         // stop the page from reloading!
@@ -257,8 +265,7 @@ fn ReceiveEcash(cx: Scope, set_info: WriteSignal<String>) -> impl IntoView {
             .expect("<input> to exist")
             .value();
 
-        // Trigger `join_resource` by updating invite code
-        set_ecash_receive.set(Some(value));
+        set_receive_value.set(Some(value));
     };
 
     view! { cx,
@@ -281,42 +288,10 @@ fn ReceiveEcash(cx: Scope, set_info: WriteSignal<String>) -> impl IntoView {
 // SendLN component
 //
 #[component]
-fn SendLN(cx: Scope, set_info: WriteSignal<String>) -> impl IntoView {
-    provide_app_context(cx);
+fn SendLN(cx: Scope) -> impl IntoView {
+    let AppContext { send_invoice, .. } = expect_context::<AppContext>(cx);
 
-    let AppContext { client, .. } = expect_context::<AppContext>(cx);
-
-    let (ln_send, set_ln_send) = create_signal::<Option<String>>(cx, None);
     let ln_send_element: NodeRef<Input> = create_node_ref(cx);
-    let client_ln_send = client.clone();
-
-    let _ln_send_resource = create_resource_with_initial_value(
-        cx,
-        move || ln_send.get(),
-        move |value| async move {
-            log!("ln_send_resource {:?}", value);
-
-            match value {
-                None => {
-                    log!("no send value");
-                    return None;
-                }
-                Some(value) => {
-                    log!("calling send");
-
-                    let c = client_ln_send.get_value();
-
-                    if let Err(e) = c.ln_send(value).await {
-                        set_info.set(format!("LN send failed: {e:?}"));
-                        return None;
-                    };
-
-                    return Some(());
-                }
-            }
-        },
-        None,
-    );
 
     let on_submit_ln_send = move |ev: SubmitEvent| {
         // stop the page from reloading!
@@ -326,7 +301,7 @@ fn SendLN(cx: Scope, set_info: WriteSignal<String>) -> impl IntoView {
         // TODO: Validate value
 
         // Trigger `join_resource` by updating invite code
-        set_ln_send.set(Some(value));
+        send_invoice.set(Some(value));
     };
 
     view! { cx,
