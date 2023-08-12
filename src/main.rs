@@ -1,7 +1,11 @@
 mod client;
 mod db;
 
+use futures::stream::StreamExt;
+use tracing::warn;
+
 use crate::client::ClientRpc;
+use fedimint_core::task::sleep;
 use fedimint_core::Amount;
 use leptos::ev::SubmitEvent;
 use leptos::html::Input;
@@ -22,26 +26,62 @@ pub fn main() {
 #[derive(Clone)]
 pub(crate) struct AppContext {
     pub client: StoredValue<ClientRpc>,
+    pub client_r: ReadSignal<Option<ClientRpc>>,
+    pub client_w: WriteSignal<Option<ClientRpc>>,
     pub balance: ReadSignal<Amount>,
+    pub name: ReadSignal<Option<String>>,
 }
+
+// TODO: tracing lib
 
 pub fn provide_app_context(cx: Scope) {
     let client = store_value(cx, ClientRpc::new());
 
-    let _balance_sub = move || async move {
-        client
-            .get_value()
-            .clone()
-            .subscribe_balance()
-            .await
-            .unwrap()
+    let (client_r, client_w) = create_signal::<Option<ClientRpc>>(cx, None);
+
+    let (name, set_name) = create_signal::<Option<String>>(cx, None);
+
+    create_effect(cx, move |_| async move {
+        if let Some(client) = client_r.get() {
+            let name = client.get_name().await.unwrap();
+            set_name.set(Some(name.clone()));
+        };
+    });
+
+    let (balance, set_balance) = create_signal(cx, Amount::ZERO);
+    create_effect(cx, move |_| async move {
+        if let Some(client) = client_r.get() {
+            log!("create effect client");
+            wasm_bindgen_futures::spawn_local(async move {
+                let mut update_b_stream = loop {
+                    let balance_res = client.clone().subscribe_balance().await;
+
+                    match balance_res {
+                        Ok(balance) => {
+                            break balance;
+                        }
+                        Err(e) => {
+                            warn!("client could not get balance: {e:?}");
+                            sleep(std::time::Duration::from_secs(1)).await;
+                        }
+                    }
+                };
+
+                while let Some(amount) = update_b_stream.next().await {
+                    log!("balance update: {}", amount.msats);
+                    set_balance.set(amount);
+                }
+            });
+        };
+    });
+
+    let context = AppContext {
+        client,
+        balance,
+        client_r,
+        client_w,
+        name,
     };
-
-    // FIXME: Make `create_signal_from_stream` work
-    // let balance = create_signal_from_stream(cx, balance_sub());
-    let (balance, _) = create_signal(cx, Amount::ZERO);
-
-    let context = AppContext { client, balance };
 
     provide_context(cx, context);
 }
@@ -53,18 +93,20 @@ pub fn provide_app_context(cx: Scope) {
 fn App(cx: Scope) -> impl IntoView {
     provide_app_context(cx);
 
-    let AppContext { client, .. } = expect_context::<AppContext>(cx);
+    let AppContext {
+        client_w: c_w,
+        name,
+        ..
+    } = expect_context::<AppContext>(cx);
 
     let (info, set_info) = create_signal(cx, "".to_string());
-
-    let (name, set_name) = create_signal::<Option<String>>(cx, None);
 
     //
     // join
     //
     let (invite_code, set_invite_code) = create_signal::<Option<String>>(cx, None);
 
-    let client_submit = client.clone();
+    // let client_submit = client.clone();
 
     // TODO: Proper error handling, return an `anyhow::Result` instead of Option<String>
     let join_resource: Resource<Option<String>, Option<()>> = create_resource_with_initial_value(
@@ -80,14 +122,11 @@ fn App(cx: Scope) -> impl IntoView {
                 }
                 Some(value) => {
                     log!("calling join");
-
-                    let c = client_submit.get_value();
+                    let c = ClientRpc::new();
+                    // let c = c.get_value();
                     // TODO: Error handling
                     _ = c.join(value).await;
-                    // get name
-                    // TODO: Error handling
-                    let name = c.get_name().await.unwrap();
-                    set_name.set(Some(name.clone()));
+                    c_w.set(Some(c.clone()));
 
                     return Some(());
                 }
@@ -115,8 +154,10 @@ fn App(cx: Scope) -> impl IntoView {
             set_info.set("Joining Federation... (pls wait)".to_string());
         } else {
             if joined() {
-                let name = name.clone().get();
-                set_info.set(format!("Joined {}", name.unwrap_or("unknown".to_string())));
+                set_info.set(format!(
+                    "Joined {}",
+                    name.get().unwrap_or("unknown".to_string())
+                ));
             } else {
                 set_info.set("Waiting to join federation...".to_string());
             }
@@ -159,11 +200,11 @@ fn App(cx: Scope) -> impl IntoView {
 //
 #[component]
 fn Balance(cx: Scope) -> impl IntoView {
-    provide_app_context(cx);
-
     let AppContext { balance, .. } = expect_context::<AppContext>(cx);
 
-    view! { cx, <p>"Balance: " {balance.get().msats} " msat"</p> }.into_view(cx)
+    view! { cx,
+    <p>"Balance: " {move || balance.get().msats} " msat"</p> }
+    .into_view(cx)
 }
 
 //
@@ -171,14 +212,12 @@ fn Balance(cx: Scope) -> impl IntoView {
 //
 #[component]
 fn ReceiveEcash(cx: Scope, set_info: WriteSignal<String>) -> impl IntoView {
-    provide_app_context(cx);
-
-    let AppContext { client, .. } = expect_context::<AppContext>(cx);
+    let AppContext { client_r, .. } = expect_context::<AppContext>(cx);
 
     let (ecash_receive, set_ecash_receive) = create_signal::<Option<String>>(cx, None);
     let ecash_receive_element: NodeRef<Input> = create_node_ref(cx);
 
-    let client_receive = client.clone();
+    let client_receive = client_r.clone();
 
     let _ecash_receive_resource = create_resource_with_initial_value(
         cx,
@@ -194,7 +233,7 @@ fn ReceiveEcash(cx: Scope, set_info: WriteSignal<String>) -> impl IntoView {
                 Some(value) => {
                     log!("calling receive");
 
-                    let c = client_receive.get_value();
+                    let c = client_receive.get().expect("client to exist");
 
                     if let Err(e) = c.receive(value).await {
                         set_info.set(format!("Receive ecash failed: {e:?}"));
