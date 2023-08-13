@@ -3,13 +3,16 @@ mod db;
 
 use fedimint_core::task::sleep;
 use futures::stream::StreamExt;
-use tracing::trace;
 
 use crate::client::ClientRpc;
 use fedimint_core::Amount;
 use leptos::ev::SubmitEvent;
 use leptos::html::Input;
 use leptos::*;
+
+fn empty_view() -> impl IntoView {
+    view! { cx, "" }
+}
 
 pub fn main() {
     tracing_wasm::set_as_global_default();
@@ -93,31 +96,18 @@ pub fn provide_app_context(cx: Scope, client: ClientRpc) {
     provide_context(cx, context);
 }
 
-#[derive(Clone)]
-pub(crate) struct TestContext {
-    pub name: Option<String>,
-}
-
-pub fn provide_test_context(cx: Scope, name: String) {
-    trace!("provide_test_context");
-    let context = TestContext { name: Some(name) };
-    provide_context(cx, context);
-}
-
 //
 // App component
 //
 #[component]
 fn App(cx: Scope) -> impl IntoView {
-    async fn join_request(invite: String) -> ClientRpc {
-        let client = ClientRpc::new();
-        // TODO: Handle result
-        _ = client.join(invite).await;
-        client
-    }
     let join_action = create_action(cx, |invoice: &String| {
         let invoice = invoice.clone();
-        join_request(invoice)
+        async move {
+            let client = ClientRpc::new();
+            _ = client.join(invoice).await;
+            client
+        }
     });
 
     let invite_code_element: NodeRef<Input> = create_node_ref(cx);
@@ -134,33 +124,40 @@ fn App(cx: Scope) -> impl IntoView {
     let joined = move || join_action.value().get().is_some();
 
     view! { cx,
-      <form on:submit=on_submit_join>
-          // TODO: Validate invite code. Listen to `on:change`
-          <input
-              type="text"
-              node_ref=invite_code_element
-              placeholder="Invite Code, i.e. fed11jpr3lgm8t…"
-              prop:disabled=joined()
-          />
-          <input
-              type="submit"
-              value="Join Federation"
-              prop:disabled=joined()
-          />
-      </form>
+
+      <Show
+      when=move || !joined()
+        fallback=|_| empty_view()
+        >
+        <p>"Join a federation"</p>
+        <form on:submit=on_submit_join>
+            // TODO: Validate invite code. Listen to `on:change`
+            <input
+                type="text"
+                node_ref=invite_code_element
+                placeholder="Invite Code, i.e. fed11jpr3lgm8t…"
+                prop:disabled=joined()
+            />
+            <input
+                type="submit"
+                value="Join Federation"
+                prop:disabled=joined()
+            />
+        </form>
+
+      </Show>
 
 
       <Show when=move || join_action.pending().get()
-        fallback=|_| view! { cx, "" }
+        fallback=|_| empty_view()
         >
         <p>"Joining ..."</p>
       </Show>
 
       <Suspense
-        fallback=move || view! { cx,
-          <p>"Loading..."</p>
-        }
+        fallback=move || view!{ cx, "Loading..."}
       >
+      <ErrorBoundary fallback=|cx, error| view!{ cx, <p>{format!("Failed to create client: {:?}", error.get())}</p>}>
       { move || {
         join_action.value().get().map(|c| {
           // Create app context to provide ClientRpc
@@ -192,16 +189,15 @@ fn App(cx: Scope) -> impl IntoView {
               .unwrap_or_else(|| "Loading...".into())
       };
 
-          // provide_test_context(cx, "world".to_string());
-          // let TestContext {name, ..} = expect_context::<TestContext>(cx);
           view! { cx,
             <p>{federation_label}</p>
             <Balance />
-            <ReceiveEcash />
+            <Receive />
             // <SendLN />
           }
         })
       }}
+      </ErrorBoundary>
       </Suspense>
 
     }
@@ -226,32 +222,14 @@ fn Balance(cx: Scope) -> impl IntoView {
 // ReceiveEcash component
 //
 #[component]
-fn ReceiveEcash(cx: Scope) -> impl IntoView {
+fn Receive(cx: Scope) -> impl IntoView {
     let AppContext { client, .. } = expect_context::<AppContext>(cx);
 
-    let (receive_value, set_receive_value) = create_signal::<Option<String>>(cx, None);
-
-    let _ = create_resource(
-        cx,
-        move || receive_value.get(),
-        move |value| async move {
-            match value {
-                None => {
-                    log!("no receive value");
-                    return None;
-                }
-                Some(value) => {
-                    log!("calling receive");
-
-                    if let Err(_) = client.get_value().receive(value).await {
-                        return None;
-                    };
-
-                    return Some(());
-                }
-            }
-        },
-    );
+    let client = client.clone();
+    let receive_action = create_action(cx, move |invoice: &String| {
+        let invoice = invoice.clone();
+        async move { client.get_value().receive(invoice).await }
+    });
 
     let ecash_receive_element: NodeRef<Input> = create_node_ref(cx);
 
@@ -265,10 +243,12 @@ fn ReceiveEcash(cx: Scope) -> impl IntoView {
             .expect("<input> to exist")
             .value();
 
-        set_receive_value.set(Some(value));
+        // set_receive_value.set(Some(value));
+        receive_action.dispatch(value);
     };
 
     view! { cx,
+
 
         <form on:submit=on_submit_ecash>
             <input
@@ -280,7 +260,26 @@ fn ReceiveEcash(cx: Scope) -> impl IntoView {
                 type="submit"
                 value="Redeem e-cash"
             />
+            <Show
+              when=move || !receive_action.pending().get()
+              fallback=move |_| view!{ cx, "..."}
+              >
+              <p>{move || {
+                match receive_action.value().get() {
+                Some(result) =>
+                  match result {
+                    Err(error) => format!("✗ Failed to redeem e-cash: {:?}", error),
+                    Ok(value) => format!("✓ Redeemed {:?} msat ", value.msats)
+                  }
+                None => "".to_string()
+              }
+          }
+          }</p>
+            </Show>
+
+
         </form>
+
     }
 }
 
