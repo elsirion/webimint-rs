@@ -24,18 +24,16 @@ pub fn main() {
 }
 
 //
-// App Context
+// Client Context
 //
 #[derive(Clone)]
-pub(crate) struct AppContext {
+pub(crate) struct ClientContext {
     pub client: StoredValue<ClientRpc>,
     pub balance: ReadSignal<Amount>,
-    pub send_invoice: WriteSignal<Option<String>>,
 }
 
-pub fn provide_app_context(cx: Scope, client: ClientRpc) {
+pub fn provide_client_context(cx: Scope, client: ClientRpc) {
     let client = store_value(cx, client);
-    let (send_invoice, set_send_invoice) = create_signal::<Option<String>>(cx, None);
 
     let (balance, set_balance) = create_signal(cx, Amount::ZERO);
 
@@ -62,36 +60,7 @@ pub fn provide_app_context(cx: Scope, client: ClientRpc) {
         }
     });
 
-    // let _ = create_resource_with_initial_value(
-    //     cx,
-    //     move || send_invoice.get(),
-    //     move |value| async move {
-    //         log!("ln_send_resource {:?}", value);
-
-    //         match value {
-    //             None => {
-    //                 log!("no send value");
-    //                 return None;
-    //             }
-    //             Some(value) => {
-    //                 log!("calling send");
-
-    //                 if let Err(_) = client.get_value().ln_send(value).await {
-    //                     return None;
-    //                 };
-
-    //                 return Some(());
-    //             }
-    //         }
-    //     },
-    //     None,
-    // );
-
-    let context = AppContext {
-        client,
-        balance,
-        send_invoice: set_send_invoice,
-    };
+    let context = ClientContext { client, balance };
 
     provide_context(cx, context);
 }
@@ -162,9 +131,9 @@ fn App(cx: Scope) -> impl IntoView {
         join_action.value().get().map(|c| {
           // Create app context to provide ClientRpc
           // as soon as it's available
-          provide_app_context(cx, c);
+          provide_client_context(cx, c);
 
-          let AppContext {client, ..} = expect_context::<AppContext>(cx);
+          let ClientContext {client, ..} = expect_context::<ClientContext>(cx);
 
           // get name of the federation
           let name_resource = create_resource(
@@ -193,7 +162,7 @@ fn App(cx: Scope) -> impl IntoView {
             <p>{federation_label}</p>
             <Balance />
             <Receive />
-            // <SendLN />
+            <Send />
           }
         })
       }}
@@ -209,7 +178,7 @@ fn App(cx: Scope) -> impl IntoView {
 
 #[component]
 fn Balance(cx: Scope) -> impl IntoView {
-    let AppContext { balance, .. } = expect_context::<AppContext>(cx);
+    let ClientContext { balance, .. } = expect_context::<ClientContext>(cx);
 
     let balance_text = move || format! {"{:?} msat", balance.get().msats};
 
@@ -223,61 +192,55 @@ fn Balance(cx: Scope) -> impl IntoView {
 //
 #[component]
 fn Receive(cx: Scope) -> impl IntoView {
-    let AppContext { client, .. } = expect_context::<AppContext>(cx);
+    let ClientContext { client, .. } = expect_context::<ClientContext>(cx);
 
     let client = client.clone();
-    let receive_action = create_action(cx, move |invoice: &String| {
+    let submit_action = create_action(cx, move |invoice: &String| {
         let invoice = invoice.clone();
         async move { client.get_value().receive(invoice).await }
     });
 
-    let ecash_receive_element: NodeRef<Input> = create_node_ref(cx);
+    let input_ref: NodeRef<Input> = create_node_ref(cx);
 
-    let on_submit_ecash = move |ev: SubmitEvent| {
+    let on_submit = move |ev: SubmitEvent| {
         // stop the page from reloading!
         ev.prevent_default();
 
         // TODO: Validate value
-        let value = ecash_receive_element
-            .get()
-            .expect("<input> to exist")
-            .value();
+        let value = input_ref.get().expect("<input> to exist").value();
 
         // set_receive_value.set(Some(value));
-        receive_action.dispatch(value);
+        submit_action.dispatch(value);
     };
 
     view! { cx,
 
-
-        <form on:submit=on_submit_ecash>
+        <form on:submit=on_submit>
             <input
                 type="text"
                 placeholder="e-cash notes, i.e. BAQB6ijaAs0mXNoyKYvhI…"
-                node_ref=ecash_receive_element
+                node_ref=input_ref
             />
             <input
                 type="submit"
                 value="Redeem e-cash"
             />
             <Show
-              when=move || !receive_action.pending().get()
+              when=move || !submit_action.pending().get()
               fallback=move |_| view!{ cx, "..."}
               >
               <p>{move || {
-                match receive_action.value().get() {
-                Some(result) =>
-                  match result {
-                    Err(error) => format!("✗ Failed to redeem e-cash: {:?}", error),
-                    Ok(value) => format!("✓ Redeemed {:?} msat ", value.msats)
+                    match submit_action.value().get() {
+                    Some(result) =>
+                      match result {
+                        Err(error) => format!("✗ Failed to redeem e-cash: {:?}", error),
+                        Ok(value) => format!("✓ Redeemed {:?} msat", value.msats)
+                      }
+                    None => "".to_string()
                   }
-                None => "".to_string()
-              }
-          }
-          }</p>
+                }
+              }</p>
             </Show>
-
-
         </form>
 
     }
@@ -287,33 +250,53 @@ fn Receive(cx: Scope) -> impl IntoView {
 // SendLN component
 //
 #[component]
-fn SendLN(cx: Scope) -> impl IntoView {
-    let AppContext { send_invoice, .. } = expect_context::<AppContext>(cx);
+fn Send(cx: Scope) -> impl IntoView {
+    let ClientContext { client, .. } = expect_context::<ClientContext>(cx);
 
-    let ln_send_element: NodeRef<Input> = create_node_ref(cx);
+    let client = client.clone();
+    let submit_action = create_action(cx, move |invoice: &String| {
+        let invoice = invoice.clone();
+        async move { client.get_value().ln_send(invoice).await }
+    });
 
-    let on_submit_ln_send = move |ev: SubmitEvent| {
+    let input_ref: NodeRef<Input> = create_node_ref(cx);
+
+    let on_submit = move |ev: SubmitEvent| {
         // stop the page from reloading!
         ev.prevent_default();
 
-        let value = ln_send_element.get().expect("<input> to exist").value();
+        let value = input_ref.get().expect("<input> to exist").value();
         // TODO: Validate value
-
-        // Trigger `join_resource` by updating invite code
-        send_invoice.set(Some(value));
+        submit_action.dispatch(value);
     };
 
     view! { cx,
-      <form on:submit=on_submit_ln_send>
+      <form on:submit=on_submit>
             <input
                 type="text"
                 placeholder="LN invoice, i.e. lnbcrt1p0…"
-                node_ref=ln_send_element
+                node_ref=input_ref
             />
             <input
                 type="submit"
                 value="Pay LN invoice"
             />
+            <Show
+            when=move || !submit_action.pending().get()
+            fallback=move |_| view!{ cx, "..."}
+            >
+            <p>{move || {
+                  match submit_action.value().get() {
+                  Some(result) =>
+                    match result {
+                      Err(error) => format!("✗ Failed to send invoice {:?}", error),
+                      Ok(_) => "✓ Invoice successfully sent".to_string()
+                    }
+                  None => "".to_string()
+                }
+              }
+            }</p>
+          </Show>
         </form>
 
     }

@@ -237,7 +237,7 @@ impl ClientRpc {
         }
     }
 
-    pub async fn ln_send(&self, invoice: String) -> anyhow::Result<()> {
+    pub async fn ln_send(&self, invoice: String) -> anyhow::Result<(), RpcError> {
         let (response_sender, response_receiver) = oneshot::channel();
         self.sender
             .send((RpcRequest::LnSend(invoice), response_sender))
@@ -246,7 +246,7 @@ impl ClientRpc {
         let response = response_receiver.await.expect("Client has stopped")?;
         match response {
             RpcResponse::LnSend => Ok(()),
-            _ => Err(anyhow::anyhow!("Invalid response")),
+            _ => Err(RpcError::InvalidResponse),
         }
     }
 }
