@@ -4,4 +4,12 @@
     "editor.formatOnSave": true
   },
   "rust-analyzer.cargo.target": "wasm32-unknown-unknown",
+  "tailwindCSS.includeLanguages": {
+    "rust": "html",
+    "*.rs": "html"
+  },
+  "files.associations": {
+    "*.rs": "rust"
+  },
+  "css.validate": false
 }
