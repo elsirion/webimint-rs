@@ -22,6 +22,8 @@ jobs:
           skipPush: true
         continue-on-error: true
 
+      - uses: Swatinem/rust-cache@v2
+
       - name: Build app
         run: nix develop --command trunk build --release
 
