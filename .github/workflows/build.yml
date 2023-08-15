@@ -1,12 +1,15 @@
-name: Publish master version of app
+name: Build App
 
 on:
   push:
     branches:
       - master
+  pull_request:
+    branches:
+      - master
 
 jobs:
-  docs:
+  build:
     name: Publish app
     runs-on: ubuntu-22.04
 
@@ -19,6 +22,7 @@ jobs:
 
       - name: Deploy app
         uses: peaceiris/actions-gh-pages@v3
+        if: github.ref == 'refs/heads/master'
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./dist
