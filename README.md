@@ -5,7 +5,7 @@
 This repo contains a proof-of-concept of how to integrate `fedimint-client` with the Leptos web framework to build a
 PWA. There are still some bugs being worked out, but there is a demo available at https://fedimint-leptos.sirion.io/.
 
-## Pre-requirements
+## Prerequisites
 
 
 Check out custom fork of `fedimint` (*temporarily - will be dropped in future*): https://github.com/okjodom/fedimint/tree/cfg-in-db
