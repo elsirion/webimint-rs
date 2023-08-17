@@ -12,5 +12,5 @@ module.exports = {
       heading: ['Space Grotesk', 'monospace'],
       body: ['Inter', 'sans-serif'],
     },
-	},
+  },
 };
