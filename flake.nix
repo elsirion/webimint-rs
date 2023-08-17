@@ -17,7 +17,11 @@
     {
       devShells.default = pkgs.mkShell {
         inputsFrom = [ fedimint.devShells."${system}".crossWasm ];
-        nativeBuildInputs = [ pkgs.trunk ];
+        nativeBuildInputs = with pkgs; [ 
+          nodejs
+          trunk
+          nodePackages.tailwindcss 
+        ];
       };
     });
 }

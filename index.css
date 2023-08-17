@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+@font-face {
+  font-family: "Space Grotesk";
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url('./assets/fonts/SpaceGrotesk-Variable.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('./assets/fonts/Inter-Variable.ttf') format('truetype');
+}
+
+@layer components {
+
+  .ease {
+    @apply transition duration-300 ease-in-out;
+  }
+
+}

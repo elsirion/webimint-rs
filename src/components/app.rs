@@ -1,10 +1,8 @@
-use crate::components::Joined;
-use leptos::ev::SubmitEvent;
+use crate::components::{Footer, Joined, Logo, SubmitForm};
 
 use crate::client::ClientRpc;
 use crate::context::provide_client_context;
 use crate::utils::empty_view;
-use leptos::html::Input;
 use leptos::*;
 
 //
@@ -16,70 +14,55 @@ pub fn App(cx: Scope) -> impl IntoView {
         let invoice = invoice.clone();
         async move {
             let client = ClientRpc::new();
-            _ = client.join(invoice).await;
-            client
+            let result = client.join(invoice).await;
+            result.ok().map(|_| client)
         }
     });
-
-    let invite_code_element: NodeRef<Input> = create_node_ref(cx);
-
-    let on_submit_join = move |ev: SubmitEvent| {
-        ev.prevent_default();
-
-        let invite = invite_code_element.get().expect("<input> to exist").value();
-        join_action.dispatch(invite);
-    };
 
     let joined = move || join_action.value().get().is_some();
 
     view! { cx,
+      <div class="h-[100dvh]">
+        <div class="mx-auto w-full h-full flex flex-col max-w-[600px] p-6">
+          <header class="flex justify-center mb-20">
+            <Logo />
+          </header>
+          <main class="w-full pb-24 flex-grow ">
+            <Show
+              when=move || !joined()
+                fallback=|_| empty_view()
+              >
+              <h1 class="font-heading text-gray-900 text-4xl font-semibold mb-6">"Join a Federation"</h1>
+              <SubmitForm
+                description="Enter invite code (i.e. fed11jpr3lgm8t…) to join a Federation".into()
+                on_submit=move |value| join_action.dispatch(value)
+                placeholder="invite code".into()
+                submit_label="Join".into()
+                loading=join_action.pending()
+              />
 
-      <Show
-      when=move || !joined()
-        fallback=|_| empty_view()
-        >
-        <p>"Join a federation"</p>
-        <form on:submit=on_submit_join>
-            // TODO: Validate invite code. Listen to `on:change`
-            <input
-                type="text"
-                node_ref=invite_code_element
-                placeholder="Invite Code, i.e. fed11jpr3lgm8t…"
-                prop:disabled=joined()
-            />
-            <input
-                type="submit"
-                value="Join Federation"
-                prop:disabled=joined()
-            />
-        </form>
+            </Show>
 
-      </Show>
+            <Suspense
+              fallback=move || view!{ cx, "Loading..."}
+            >
+            <ErrorBoundary fallback=|cx, error| view!{ cx, <p>{format!("Failed to create client: {:?}", error.get())}</p>}>
+            { move || {
+              join_action.value().get().flatten().map(|c| {
+                  // Create app context to provide ClientRpc
+                  // as soon as it's available
+                  provide_client_context(cx, c);
 
-
-      <Show when=move || join_action.pending().get()
-        fallback=|_| empty_view()
-        >
-        <p>"Joining ..."</p>
-      </Show>
-
-      <Suspense
-        fallback=move || view!{ cx, "Loading..."}
-      >
-      <ErrorBoundary fallback=|cx, error| view!{ cx, <p>{format!("Failed to create client: {:?}", error.get())}</p>}>
-      { move || {
-        join_action.value().get().map(|c| {
-          // Create app context to provide ClientRpc
-          // as soon as it's available
-          provide_client_context(cx, c);
-
-          view! { cx,
-            <Joined />
-          }
-        })
-      }}
-      </ErrorBoundary>
-      </Suspense>
-
+                  view! { cx,
+                    <Joined />
+                  }
+                })
+              }}
+            </ErrorBoundary>
+            </Suspense>
+          </main>
+          <Footer class="w-full py-2" />
+        </div>
+      </div>
     }
 }

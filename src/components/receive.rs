@@ -1,7 +1,6 @@
-use leptos::ev::SubmitEvent;
-use leptos::html::Input;
 use leptos::*;
 
+use crate::components::SubmitForm;
 use crate::context::ClientContext;
 
 //
@@ -17,46 +16,30 @@ pub fn Receive(cx: Scope) -> impl IntoView {
         async move { client.get_value().receive(invoice).await }
     });
 
-    let input_ref: NodeRef<Input> = create_node_ref(cx);
-
-    let on_submit = move |ev: SubmitEvent| {
-        ev.prevent_default();
-
-        // TODO: Validate value
-        let value = input_ref.get().expect("<input> to exist").value();
-
-        submit_action.dispatch(value);
-    };
-
     view! { cx,
 
-        <form on:submit=on_submit>
-            <input
-                type="text"
-                placeholder="e-cash notes, i.e. BAQB6ijaAs0mXNoyKYvhI…"
-                node_ref=input_ref
-            />
-            <input
-                type="submit"
-                value="Redeem e-cash"
-            />
-            <Show
-              when=move || !submit_action.pending().get()
-              fallback=move |_| view!{ cx, "..."}
-              >
-              <p>{move || {
-                    match submit_action.value().get() {
-                    Some(result) =>
-                      match result {
-                        Err(error) => format!("✗ Failed to redeem e-cash: {:?}", error),
-                        Ok(value) => format!("✓ Redeemed {:?} msat", value.msats)
-                      }
-                    None => "".to_string()
-                  }
-                }
-              }</p>
-            </Show>
-        </form>
+      <SubmitForm
+        description="Enter e-cash notes (i.e. BAQB6ijaAs0mXNoyKYvhI…) to redeem".into()
+        on_submit=move |v| submit_action.dispatch(v)
+        placeholder="e-cash notes".into()
+        submit_label="Redeem".into()
+        loading=submit_action.pending()
+      />
+
+      {move ||
+        if let Some(result) = submit_action.value().get() {
+          view!(cx,
+            <div class="text-body text-md mt-4">{
+              match result {
+                Err(error) => view!(cx, <span class="text-red-500">{format!("✗ Failed to redeem e-cash: {error}")}</span>),
+                Ok(value) => view!(cx, <span class="text-green-600">{format!("✓ Redeemed {:?} msat", value.msats)}</span>)
+              }
+            }
+            </div>)
+        } else  {
+          view!(cx, <div></div>)
+        }
+      }
 
     }
 }
