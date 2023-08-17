@@ -1,4 +1,4 @@
-use crate::components::{Joined, Logo, SubmitForm};
+use crate::components::{Footer, Joined, Logo, SubmitForm};
 
 use crate::client::ClientRpc;
 use crate::context::provide_client_context;
@@ -23,11 +23,11 @@ pub fn App(cx: Scope) -> impl IntoView {
 
     view! { cx,
       <div class="h-[100dvh]">
-        <div class="mx-auto w-full max-w-[600px] p-6">
-          <header class="w-full mb-20">
+        <div class="mx-auto w-full h-full flex flex-col max-w-[600px] p-6">
+          <header class="flex justify-center mb-20">
             <Logo />
           </header>
-          <main class="w-full flex flex-col">
+          <main class="w-full pb-24 flex-grow ">
             <Show
               when=move || !joined()
                 fallback=|_| empty_view()
@@ -61,6 +61,7 @@ pub fn App(cx: Scope) -> impl IntoView {
             </ErrorBoundary>
             </Suspense>
           </main>
+          <Footer class="w-full py-2" />
         </div>
       </div>
     }

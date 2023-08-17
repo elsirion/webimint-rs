@@ -26,16 +26,20 @@ pub fn Receive(cx: Scope) -> impl IntoView {
         loading=submit_action.pending()
       />
 
-      <p>{move || {
-            match submit_action.value().get() {
-            Some(result) =>
+      {move ||
+        if let Some(result) = submit_action.value().get() {
+          view!(cx,
+            <div class="text-body text-md mt-4">{
               match result {
-                Err(error) => format!("✗ Failed to redeem e-cash: {:?}", error),
-                Ok(value) => format!("✓ Redeemed {:?} msat", value.msats)
+                Err(error) => view!(cx, <span class="text-red-500">{format!("✗ Failed to redeem e-cash: {error}")}</span>),
+                Ok(value) => view!(cx, <span class="text-green-600">{format!("✓ Redeemed {:?} msat", value.msats)}</span>)
               }
-            None => "".to_string()
-          }
+            }
+            </div>)
+        } else  {
+          view!(cx, <div></div>)
         }
-      }</p>
+      }
+
     }
 }

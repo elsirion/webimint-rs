@@ -37,14 +37,30 @@ pub fn Joined(cx: Scope) -> impl IntoView {
             .unwrap_or_else(|| "Loading...".into())
     };
 
-    let (tab, set_tab) = create_signal(cx, Tab::Send);
+    let (tab, set_tab) = create_signal(cx, Tab::Receive);
 
     view! { cx,
-      <h1 class="font-heading text-gray-900 text-4xl font-semibold mb-6">{federation_label}</h1>
-      <Balance class="my-6" />
+      <h1 class="font-heading text-gray-900 text-4xl font-semibold">{federation_label}</h1>
+      <Balance class="my-12" />
       <ul
         class="my-12 w-full flex flex-row"
         >
+        <li class="w-1/2">
+        <button
+          on:click=move |_| {
+            set_tab.set(Tab::Receive);
+          }
+          class={move || format!("my-2 block w-full text-center
+          border-b-2 
+          py-4
+          ease
+          font-body font-semibold  
+          text-xl leading-tight hover:text-blue-500 {active}", 
+          active = if tab.get() == Tab::Receive  {"text-blue-400 border-blue-400"} else {"text-gray-400 border-gray-200 hover:border-gray-700"} )}
+
+          >Redeem
+        </button>
+      </li>
         <li class="w-1/2">
           <button
             on:click=move |_| {
@@ -55,25 +71,9 @@ pub fn Joined(cx: Scope) -> impl IntoView {
             py-4
             ease
             font-body font-semibold  
-            text-xl leading-tight hover:text-gray-700 {active}", 
-            active = if tab.get() == Tab::Send {"text-gray-700 border-gray-700"} else {"text-gray-400 border-gray-200 hover:border-gray-700"} )}
+            text-xl leading-tight hover:text-blue-500 {active}", 
+            active = if tab.get() == Tab::Send {"text-blue-400 border-blue-400"} else {"text-gray-400 border-gray-200 hover:border-gray-700"} )}
             >Send
-          </button>
-        </li>
-        <li class="w-1/2">
-          <button
-            on:click=move |_| {
-              set_tab.set(Tab::Receive);
-            }
-            class={move || format!("my-2 block w-full text-center
-            border-b-2 
-            py-4
-            ease
-            font-body font-semibold  
-            text-xl leading-tight hover:text-gray-700 {active}", 
-            active = if tab.get() == Tab::Receive {"text-gray-700 border-gray-700"} else {"text-gray-400 border-gray-200 hover:border-gray-700"} )}
-
-            >Redeem
           </button>
         </li>
       </ul>

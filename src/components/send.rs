@@ -26,17 +26,21 @@ pub fn Send(cx: Scope) -> impl IntoView {
         loading=submit_action.pending()
       />
 
-      <p>{move || {
-            match submit_action.value().get() {
-            Some(result) =>
+
+      {move ||
+        if let Some(result) = submit_action.value().get() {
+          view!(cx,
+            <div class="text-body text-md mt-4">{
               match result {
-                Err(error) => format!("✗ Failed to send invoice {:?}", error),
-                Ok(_) => "✓ Invoice successfully sent".into()
+                Err(error) => view!(cx, <span class="text-red-500">{format!("✗ Failed to send invoice {error}")}</span>),
+                Ok(_) => view!(cx, <span class="text-green-600">"✓ Invoice successfully sent"</span>)
               }
-            None => "".into()
-          }
+            }
+            </div>)
+        } else  {
+          view!(cx, <div></div>)
         }
-      }</p>
+      }
 
     }
 }
