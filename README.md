@@ -15,7 +15,7 @@ Make sure you have [set up local dev environment](https://github.com/fedimint/fe
 Open terminal and run to open development shell:
 
 ```shell
-`nix develop
+nix develop
 
 just build
 just mprocs
@@ -40,6 +40,9 @@ The invite code is needed in next step `Development`.
 
 ```shell 
 nix develop
+
+# only once
+npm i
 
 trunk serve
 ```
