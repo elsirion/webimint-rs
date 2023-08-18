@@ -8,7 +8,13 @@ PWA. There are still some bugs being worked out, but there is a demo available a
 ## Prerequisites
 
 
-Check out custom fork of `fedimint` (*temporarily - will be dropped in future*): https://github.com/okjodom/fedimint/tree/cfg-in-db
+Check out [Fedimint](https://github.com/fedimint/fedimint) at commit `183bff69f030b89f2cd78dbb91bdecf895048e3e`:
+
+```shell
+git clone https://github.com/fedimint/fedimint
+cd fedimint
+git checkout 183bff69f030b89f2cd78dbb91bdecf895048e3e
+```
 
 Make sure you have [set up local dev environment](https://github.com/fedimint/fedimint/blob/master/docs/dev-env.md) needed to run `fedimint` locally
 
