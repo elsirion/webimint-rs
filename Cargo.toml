@@ -19,6 +19,7 @@ fedimint-ln-client = { git = "https://github.com/fedimint/fedimint", rev = "183b
 futures = "0.3.28"
 hex = "0.4.3"
 leptos = { version = "0.4.8", features = ["csr"] }
+leptos-qr-scanner = { git = "https://github.com/elsirion/leptos-qr-scanner", rev = "75e976e99d9c1ed64921081a23f7da823d2a0b6d" }
 leptos_meta = { version = "0.4.8", features = ["csr"] }
 lightning-invoice = { version = "0.21.0", features = [ "serde" ] }
 
