@@ -3,7 +3,6 @@ use fedimint_client::secret::PlainRootSecretStrategy;
 use fedimint_client::Client;
 use fedimint_core::api::InviteCode;
 use fedimint_core::db::mem_impl::MemDatabase;
-use fedimint_core::task::TaskGroup;
 use fedimint_core::util::BoxStream;
 use fedimint_core::Amount;
 use fedimint_ln_client::{LightningClientExt, LightningClientGen};
@@ -94,8 +93,7 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
         client_builder.with_database(MemDatabase::new());
         client_builder.with_primary_module(1);
         client_builder.with_invite_code(invite_code);
-        let tg = TaskGroup::new();
-        let client_res = client_builder.build::<PlainRootSecretStrategy>(tg).await;
+        let client_res = client_builder.build::<PlainRootSecretStrategy>().await;
 
         match client_res {
             Ok(client) => {

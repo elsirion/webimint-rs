@@ -1,14 +1,15 @@
-use anyhow::anyhow;
-use fedimint_core::db::SingleUseDatabaseTransaction;
+use anyhow::{anyhow, Result};
 use fedimint_core::db::{
     IDatabase, IDatabaseTransaction, ISingleUseDatabaseTransaction, PrefixStream,
 };
+use fedimint_core::db::{IDatabaseTransactionOps, SingleUseDatabaseTransaction};
 use fedimint_core::{apply, async_trait_maybe_send};
 use rexie::{Direction, KeyRange, TransactionMode};
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use tracing::{debug, info};
 
+use futures::StreamExt;
 use wasm_bindgen::JsValue;
 
 const STORE_NAME: &str = "fedimint";
@@ -40,6 +41,19 @@ pub struct WasmDatabaseTransaction<'a>(Option<rexie::Transaction>, PhantomData<&
 
 #[apply(async_trait_maybe_send!)]
 impl<'a> IDatabaseTransaction<'a> for WasmDatabaseTransaction<'a> {
+    async fn commit_tx(mut self) -> anyhow::Result<()> {
+        self.0
+            .take()
+            .ok_or(anyhow!("Transaction already committed"))?
+            .commit()
+            .await
+            .map_err(|e| anyhow!("Could not commit IndexedDB transaction: {e:?}"))?;
+        Ok(())
+    }
+}
+
+#[apply(async_trait_maybe_send!)]
+impl<'a> IDatabaseTransactionOps<'a> for WasmDatabaseTransaction<'a> {
     async fn raw_insert_bytes(
         &mut self,
         key: &[u8],
@@ -123,21 +137,24 @@ impl<'a> IDatabaseTransaction<'a> for WasmDatabaseTransaction<'a> {
         Ok(Box::pin(futures::stream::iter(iter)))
     }
 
-    async fn commit_tx(mut self) -> anyhow::Result<()> {
-        self.0
-            .take()
-            .ok_or(anyhow!("Transaction already committed"))?
-            .commit()
-            .await
-            .map_err(|e| anyhow!("Could not commit IndexedDB transaction: {e:?}"))?;
+    async fn raw_remove_by_prefix(&mut self, key_prefix: &[u8]) -> Result<()> {
+        let keys = self
+            .raw_find_by_prefix(key_prefix)
+            .await?
+            .map(|kv| kv.0)
+            .collect::<Vec<_>>()
+            .await;
+        for key in keys {
+            self.raw_remove_entry(key.as_slice()).await?;
+        }
         Ok(())
     }
 
-    async fn rollback_tx_to_savepoint(&mut self) {
+    async fn rollback_tx_to_savepoint(&mut self) -> anyhow::Result<()> {
         unimplemented!("Savepoints are not supported in IndexedDB")
     }
 
-    async fn set_tx_savepoint(&mut self) {
+    async fn set_tx_savepoint(&mut self) -> anyhow::Result<()> {
         unimplemented!("Savepoints are not supported in IndexedDB")
     }
 }
