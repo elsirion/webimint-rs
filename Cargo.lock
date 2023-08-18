@@ -723,6 +723,7 @@ dependencies = [
  "futures",
  "hex",
  "leptos",
+ "leptos_meta",
  "lightning-invoice",
  "rexie",
  "serde",
@@ -1630,6 +1631,20 @@ dependencies = [
  "syn 2.0.28",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "leptos_meta"
+version = "0.4.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed4e4855b6d0047f1cdbf0e9d41b76a1b596ec374f844d2bae1e48f2d2df70d8"
+dependencies = [
+ "cfg-if",
+ "indexmap 2.0.0",
+ "leptos",
+ "tracing",
+ "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]

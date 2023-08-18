@@ -4,6 +4,7 @@ use crate::client::ClientRpc;
 use crate::context::provide_client_context;
 use crate::utils::empty_view;
 use leptos::*;
+use leptos_meta::Title;
 
 //
 // App component
@@ -22,6 +23,7 @@ pub fn App(cx: Scope) -> impl IntoView {
     let joined = move || join_action.value().get().is_some();
 
     view! { cx,
+      <Title text="Fedimint Web Client" />
       <div class="h-[100dvh]">
         <div class="mx-auto w-full h-full flex flex-col max-w-[600px] p-6">
           <header class="flex justify-center mb-20">
