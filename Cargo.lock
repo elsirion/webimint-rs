@@ -723,6 +723,7 @@ dependencies = [
  "futures",
  "hex",
  "leptos",
+ "leptos-qr-scanner",
  "leptos_meta",
  "lightning-invoice",
  "rexie",
@@ -1547,6 +1548,18 @@ dependencies = [
  "server_fn",
  "tracing",
  "typed-builder",
+]
+
+[[package]]
+name = "leptos-qr-scanner"
+version = "0.1.0"
+source = "git+https://github.com/elsirion/leptos-qr-scanner?rev=75e976e99d9c1ed64921081a23f7da823d2a0b6d#75e976e99d9c1ed64921081a23f7da823d2a0b6d"
+dependencies = [
+ "js-sys",
+ "leptos",
+ "serde",
+ "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]
