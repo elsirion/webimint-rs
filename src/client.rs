@@ -25,6 +25,7 @@ enum RpcRequest {
     SubscribeBalance,
     Receive(String),
     LnSend(String),
+    LnReceive { amount: Amount, description: String },
 }
 
 enum RpcResponse {
@@ -33,6 +34,7 @@ enum RpcResponse {
     SubscribeBalance(BoxStream<'static, Amount>),
     Receive(Amount),
     LnSend,
+    LnReceive(String),
 }
 
 impl Debug for RpcResponse {
@@ -160,6 +162,19 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
                     )
                     .map_err(|_| warn!("RPC receiver dropped before response was sent"));
             }
+            RpcRequest::LnReceive {
+                amount,
+                description,
+            } => {
+                let invoice = client
+                    .create_bolt11_invoice(amount, description, None)
+                    .await
+                    .map(|(_, invoice)| RpcResponse::LnReceive(invoice.to_string()));
+
+                let _ = response_sender
+                    .send(invoice)
+                    .map_err(|_| warn!("RPC receiver dropped before response was sent"));
+            }
             req => {
                 let _ = response_sender
                     .send(Err(anyhow::anyhow!("Invalid request: {req:?}")))
@@ -244,6 +259,29 @@ impl ClientRpc {
         let response = response_receiver.await.expect("Client has stopped")?;
         match response {
             RpcResponse::LnSend => Ok(()),
+            _ => Err(RpcError::InvalidResponse),
+        }
+    }
+
+    pub async fn ln_receive(
+        &self,
+        amount_msat: u64,
+        description: String,
+    ) -> anyhow::Result<String, RpcError> {
+        let (response_sender, response_receiver) = oneshot::channel();
+        self.sender
+            .send((
+                RpcRequest::LnReceive {
+                    amount: Amount::from_msats(amount_msat),
+                    description,
+                },
+                response_sender,
+            ))
+            .await
+            .expect("Client has stopped");
+        let response = response_receiver.await.expect("Client has stopped")?;
+        match response {
+            RpcResponse::LnReceive(invoice) => Ok(invoice),
             _ => Err(RpcError::InvalidResponse),
         }
     }

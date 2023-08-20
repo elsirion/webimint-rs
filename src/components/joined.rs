@@ -2,12 +2,13 @@ use leptos::*;
 
 use crate::context::ClientContext;
 
-use crate::components::{Balance, Receive, Send};
+use crate::components::{Balance, Receive, ReceiveLn, Send};
 use crate::utils::empty_view;
 
 #[derive(Clone, PartialEq)]
 enum Tab {
     Send,
+    ReceiveLn,
     Receive,
 }
 
@@ -45,7 +46,7 @@ pub fn Joined(cx: Scope) -> impl IntoView {
       <ul
         class="my-12 w-full flex flex-row"
         >
-        <li class="w-1/2">
+        <li class="w-1/3">
         <button
           on:click=move |_| {
             set_tab.set(Tab::Receive);
@@ -61,7 +62,7 @@ pub fn Joined(cx: Scope) -> impl IntoView {
           >Redeem
         </button>
       </li>
-        <li class="w-1/2">
+        <li class="w-1/3">
           <button
             on:click=move |_| {
               set_tab.set(Tab::Send);
@@ -73,8 +74,22 @@ pub fn Joined(cx: Scope) -> impl IntoView {
             font-body font-semibold  
             text-xl leading-tight hover:text-blue-500 {active}", 
             active = if tab.get() == Tab::Send {"text-blue-400 border-blue-400"} else {"text-gray-400 border-gray-200 hover:border-gray-700"} )}
-            >Send
+            >LN Send
           </button>
+        </li>
+        <li class="w-1/2">
+          <button
+            on:click=move |_| {
+              set_tab.set(Tab::ReceiveLn);
+            }
+            class={move || format!("my-2 block w-full text-center
+            border-b-2 
+            py-4
+            ease
+            font-body font-semibold  
+            text-xl leading-tight hover:text-blue-500 {active}", 
+            active = if tab.get() == Tab::ReceiveLn  {"text-blue-400 border-blue-400"} else {"text-gray-400 border-gray-200 hover:border-gray-700"} )}
+          >LN Receive</button>
         </li>
       </ul>
 
@@ -90,7 +105,12 @@ pub fn Joined(cx: Scope) -> impl IntoView {
           >
           <Receive />
       </Show>
-
+      <Show
+          when=move || tab.get() == Tab::ReceiveLn
+          fallback=|_| empty_view()
+          >
+          <ReceiveLn />
+      </Show>
 
 
     }
