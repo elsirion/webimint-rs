@@ -6,6 +6,7 @@ pub mod ln_receive_form;
 pub mod loader_icon;
 pub mod logo;
 pub mod logo_fedimint;
+pub mod qrcode;
 pub mod receive;
 pub mod receive_ln;
 pub mod send;
