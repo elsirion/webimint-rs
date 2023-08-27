@@ -37,10 +37,35 @@ pub fn ReceiveLn(cx: Scope) -> impl IntoView {
             >
             { move || {
                 match submit_action.value().get() {
-                    Some(Ok(invoice)) => {
+                    Some(Ok((invoice, await_paid))) => {
                         let qr_invoice_upper = format!("lightning:{invoice}").to_ascii_uppercase();
+
+                        let paid_resource = create_resource(cx, || (), move |()| {
+                            let mut await_paid = await_paid.clone();
+                            async move {
+                                let _ = await_paid.wait_for(|paid| *paid).await;
+                            }
+                        });
+
                         view!{ cx,
                             <div class="w-full">
+                                { move || {
+                                    // TODO: fix
+                                    // Needed to suppress loading screen
+                                    if paid_resource.loading().get() {
+                                        return empty_view().into_view(cx);
+                                    }
+
+                                    match paid_resource.read(cx) {
+                                        Some(()) => view! {cx,
+                                            <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 w-full mb-8" role="alert">
+                                                <p class="font-bold">Success</p>
+                                                <p>The invoice has been paid!</p>
+                                            </div>
+                                        }.into_view(cx),
+                                        None => empty_view().into_view(cx),
+                                    }
+                                }}
                                 <span class="break-all" style="font-family: mono">{&invoice}</span>
                                 <QrCode
                                     data={Signal::derive(cx, move || qr_invoice_upper.clone())}

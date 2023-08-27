@@ -4,12 +4,14 @@ use fedimint_client::sm::OperationId;
 use fedimint_client::Client;
 use fedimint_core::api::InviteCode;
 use fedimint_core::db::mem_impl::MemDatabase;
+use fedimint_core::task::spawn;
 use fedimint_core::util::BoxStream;
 use fedimint_core::Amount;
 use fedimint_ln_client::{LightningClientExt, LightningClientGen, LightningMeta};
 use fedimint_mint_client::{parse_ecash, MintClientExt};
 use fedimint_mint_client::{MintClientGen, MintMeta, MintMetaVariants};
 use fedimint_wallet_client::WalletClientGen;
+use futures::StreamExt;
 use leptos::warn;
 use lightning_invoice::{Invoice, InvoiceDescription};
 use serde::{Deserialize, Serialize};
@@ -17,7 +19,7 @@ use std::fmt::{Debug, Formatter};
 use std::str::FromStr;
 use std::time::SystemTime;
 use thiserror::Error as ThisError;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::{mpsc, oneshot, watch};
 use tracing::{debug, info};
 
 #[derive(Debug, Clone)]
@@ -38,7 +40,10 @@ enum RpcResponse {
     SubscribeBalance(BoxStream<'static, Amount>),
     Receive(Amount),
     LnSend,
-    LnReceive(String),
+    LnReceive {
+        invoice: String,
+        await_paid: watch::Receiver<bool>,
+    },
     ListTransactions(Vec<Transaction>),
 }
 
@@ -181,13 +186,38 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
                 amount,
                 description,
             } => {
-                let invoice = client
+                let (operation_id, invoice) = match client
                     .create_bolt11_invoice(amount, description, None)
                     .await
-                    .map(|(_, invoice)| RpcResponse::LnReceive(invoice.to_string()));
+                {
+                    Ok(res) => res,
+                    Err(e) => {
+                        let _ = response_sender
+                            .send(Err(e))
+                            .map_err(|_| warn!("RPC receiver dropped before response was sent"));
+                        continue;
+                    }
+                };
+
+                let (await_paid_sender, await_paid_receiver) = watch::channel(false);
+                let mut subscription = client
+                    .subscribe_ln_receive(operation_id)
+                    .await
+                    .expect("subscribing to a just created operation can't fail")
+                    .into_stream();
+                spawn(async move {
+                    while let Some(state) = subscription.next().await {
+                        if state == fedimint_ln_client::LnReceiveState::Funded {
+                            let _ = await_paid_sender.send(true);
+                        }
+                    }
+                });
 
                 let _ = response_sender
-                    .send(invoice)
+                    .send(Ok(RpcResponse::LnReceive {
+                        invoice: invoice.to_string(),
+                        await_paid: await_paid_receiver,
+                    }))
                     .map_err(|_| warn!("RPC receiver dropped before response was sent"));
             }
             RpcRequest::ListTransactions => {
@@ -348,7 +378,7 @@ impl ClientRpc {
         &self,
         amount_msat: u64,
         description: String,
-    ) -> anyhow::Result<String, RpcError> {
+    ) -> anyhow::Result<(String, watch::Receiver<bool>), RpcError> {
         let (response_sender, response_receiver) = oneshot::channel();
         self.sender
             .send((
@@ -362,7 +392,10 @@ impl ClientRpc {
             .expect("Client has stopped");
         let response = response_receiver.await.expect("Client has stopped")?;
         match response {
-            RpcResponse::LnReceive(invoice) => Ok(invoice),
+            RpcResponse::LnReceive {
+                invoice,
+                await_paid,
+            } => Ok((invoice, await_paid)),
             _ => Err(RpcError::InvalidResponse),
         }
     }
