@@ -2,11 +2,12 @@ use leptos::*;
 
 use crate::context::ClientContext;
 
-use crate::components::{Balance, Receive, ReceiveLn, Send};
+use crate::components::{Balance, Receive, ReceiveLn, Send, TxList};
 use crate::utils::empty_view;
 
 #[derive(Clone, PartialEq)]
 enum Tab {
+    TxList,
     Send,
     ReceiveLn,
     Receive,
@@ -46,7 +47,23 @@ pub fn Joined(cx: Scope) -> impl IntoView {
       <ul
         class="my-12 w-full flex flex-row"
         >
-        <li class="w-1/3">
+        <li class="w-1/4">
+        <button
+          on:click=move |_| {
+            set_tab.set(Tab::TxList);
+          }
+          class={move || format!("my-2 block w-full text-center
+          border-b-2 
+          py-4
+          ease
+          font-body font-semibold  
+          text-xl leading-tight hover:text-blue-500 {active}", 
+          active = if tab.get() == Tab::TxList  {"text-blue-400 border-blue-400"} else {"text-gray-400 border-gray-200 hover:border-gray-700"} )}
+          >
+            Transactions
+        </button>
+      </li>
+        <li class="w-1/4">
         <button
           on:click=move |_| {
             set_tab.set(Tab::Receive);
@@ -62,7 +79,7 @@ pub fn Joined(cx: Scope) -> impl IntoView {
           >Redeem
         </button>
       </li>
-        <li class="w-1/3">
+        <li class="w-1/4">
           <button
             on:click=move |_| {
               set_tab.set(Tab::Send);
@@ -77,7 +94,7 @@ pub fn Joined(cx: Scope) -> impl IntoView {
             >LN Send
           </button>
         </li>
-        <li class="w-1/2">
+        <li class="w-1/4">
           <button
             on:click=move |_| {
               set_tab.set(Tab::ReceiveLn);
@@ -111,7 +128,12 @@ pub fn Joined(cx: Scope) -> impl IntoView {
           >
           <ReceiveLn />
       </Show>
-
+      <Show
+          when=move || tab.get() == Tab::TxList
+          fallback=|_| empty_view()
+          >
+          <TxList update_signal=move || {tab.get();} />
+      </Show>
 
     }
 }

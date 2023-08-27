@@ -1,19 +1,21 @@
 use anyhow;
 use fedimint_client::secret::PlainRootSecretStrategy;
+use fedimint_client::sm::OperationId;
 use fedimint_client::Client;
 use fedimint_core::api::InviteCode;
 use fedimint_core::db::mem_impl::MemDatabase;
 use fedimint_core::util::BoxStream;
 use fedimint_core::Amount;
-use fedimint_ln_client::{LightningClientExt, LightningClientGen};
-use fedimint_mint_client::MintClientGen;
+use fedimint_ln_client::{LightningClientExt, LightningClientGen, LightningMeta};
 use fedimint_mint_client::{parse_ecash, MintClientExt};
+use fedimint_mint_client::{MintClientGen, MintMeta, MintMetaVariants};
 use fedimint_wallet_client::WalletClientGen;
 use leptos::warn;
-use lightning_invoice::Invoice;
+use lightning_invoice::{Invoice, InvoiceDescription};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
 use std::str::FromStr;
+use std::time::SystemTime;
 use thiserror::Error as ThisError;
 use tokio::sync::{mpsc, oneshot};
 use tracing::{debug, info};
@@ -26,6 +28,8 @@ enum RpcRequest {
     Receive(String),
     LnSend(String),
     LnReceive { amount: Amount, description: String },
+    // TODO: pagination
+    ListTransactions,
 }
 
 enum RpcResponse {
@@ -35,6 +39,17 @@ enum RpcResponse {
     Receive(Amount),
     LnSend,
     LnReceive(String),
+    ListTransactions(Vec<Transaction>),
+}
+
+// TODO: add status update stream
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Transaction {
+    pub timestamp: SystemTime,
+    pub operation_id: OperationId,
+    pub operation_kind: String,
+    pub amount_msat: i64,
+    pub description: Option<String>,
 }
 
 impl Debug for RpcResponse {
@@ -175,6 +190,72 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
                     .send(invoice)
                     .map_err(|_| warn!("RPC receiver dropped before response was sent"));
             }
+            RpcRequest::ListTransactions => {
+                let transactions = client
+                    .operation_log()
+                    .list_operations(100, None)
+                    .await
+                    .into_iter()
+                    .map(|(key, op_log)| {
+                        let (amount_msat, description) = match op_log.operation_type() {
+                            "mint" => {
+                                let meta = op_log.meta::<MintMeta>();
+                                match meta.variant {
+                                    MintMetaVariants::Reissuance { .. } => {
+                                        (meta.amount.msats as i64, None)
+                                    }
+                                    MintMetaVariants::SpendOOB { .. } => {
+                                        (-(meta.amount.msats as i64), None)
+                                    }
+                                }
+                            }
+                            "ln" => match op_log.meta::<LightningMeta>() {
+                                LightningMeta::Receive { invoice, .. } => {
+                                    let amount = invoice
+                                        .amount_milli_satoshis()
+                                        .expect("We don't create 0 amount invoices")
+                                        as i64;
+                                    let description = match invoice.description() {
+                                        InvoiceDescription::Direct(description) => {
+                                            Some(description.to_string())
+                                        }
+                                        InvoiceDescription::Hash(_) => None,
+                                    };
+
+                                    (amount, description)
+                                }
+                                LightningMeta::Pay { invoice, .. } => {
+                                    // TODO: add fee
+                                    let amount = -(invoice
+                                        .amount_milli_satoshis()
+                                        .expect("Can't pay 0 amount invoices")
+                                        as i64);
+                                    let description = match invoice.description() {
+                                        InvoiceDescription::Direct(description) => {
+                                            Some(description.to_string())
+                                        }
+                                        InvoiceDescription::Hash(_) => None,
+                                    };
+
+                                    (amount, description)
+                                }
+                            },
+                            _ => panic!("Unsupported module"),
+                        };
+
+                        Transaction {
+                            timestamp: key.creation_time,
+                            operation_id: key.operation_id,
+                            operation_kind: op_log.operation_type().to_owned(),
+                            amount_msat,
+                            description,
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                let _ = response_sender
+                    .send(Ok(RpcResponse::ListTransactions(transactions)))
+                    .map_err(|_| warn!("RPC receiver dropped before response was sent"));
+            }
             req => {
                 let _ = response_sender
                     .send(Err(anyhow::anyhow!("Invalid request: {req:?}")))
@@ -282,6 +363,19 @@ impl ClientRpc {
         let response = response_receiver.await.expect("Client has stopped")?;
         match response {
             RpcResponse::LnReceive(invoice) => Ok(invoice),
+            _ => Err(RpcError::InvalidResponse),
+        }
+    }
+
+    pub async fn list_transactions(&self) -> anyhow::Result<Vec<Transaction>, RpcError> {
+        let (response_sender, response_receiver) = oneshot::channel();
+        self.sender
+            .send((RpcRequest::ListTransactions, response_sender))
+            .await
+            .expect("Client has stopped");
+        let response = response_receiver.await.expect("Client has stopped")?;
+        match response {
+            RpcResponse::ListTransactions(transactions) => Ok(transactions),
             _ => Err(RpcError::InvalidResponse),
         }
     }
