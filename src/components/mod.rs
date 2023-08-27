@@ -12,6 +12,7 @@ pub mod receive_ln;
 pub mod send;
 pub mod submit_button;
 pub mod submit_form;
+pub mod tx_list;
 
 pub use app::*;
 pub use balance::*;
@@ -25,3 +26,4 @@ pub use receive_ln::*;
 pub use send::*;
 pub use submit_button::*;
 pub use submit_form::*;
+pub use tx_list::*;
