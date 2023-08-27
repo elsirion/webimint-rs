@@ -1,4 +1,5 @@
 use crate::components::ln_receive_form::LnReceiveForm;
+use crate::components::qrcode::QrCode;
 use crate::context::ClientContext;
 use crate::utils::empty_view;
 use leptos::*;
@@ -29,14 +30,30 @@ pub fn ReceiveLn(cx: Scope) -> impl IntoView {
             }
         />
         { move || {
-            if let Some(invoice) = submit_action.value().get() {
-                view!(cx,
-                    <div class="w-full my-4 p-4 bg-slate-100">
-                        <span class="break-all" style="font-family: mono">{invoice}</span>
-                    </div>
-                ).into_view(cx)
-            } else {
-                empty_view().into_view(cx)
+            match submit_action.value().get() {
+                Some(Ok(invoice)) => {
+                    let qr_invoice_upper = format!("lightning:{invoice}").to_ascii_uppercase();
+                    view!{ cx,
+                        <div class="w-full my-4 p-4 bg-slate-100">
+                            <span class="break-all" style="font-family: mono">{&invoice}</span>
+                            <QrCode
+                                data={Signal::derive(cx, move || qr_invoice_upper.clone())}
+                                class="w-full mt-8"
+                            />
+                        </div>
+                    }.into_view(cx)
+                }
+                Some(Err(e)) => {
+                    view!{ cx,
+                        <div class="bg-orange-100 border-l-4 border-orange-500 text-orange-700 p-4" role="alert">
+                            <p class="font-bold">Error</p>
+                            <p>{e.to_string()}</p>
+                        </div>
+                    }.into_view(cx)
+                }
+                None => {
+                    empty_view().into_view(cx)
+                }
             }
         }}
     }

@@ -11,6 +11,7 @@ opt-level = 'z'
 [dependencies]
 async-trait = "0.1.68"
 anyhow = "1.0.71"
+base64 = "0.21.3"
 fedimint-client = { git = "https://github.com/fedimint/fedimint", rev = "183bff69f030b89f2cd78dbb91bdecf895048e3e" }
 fedimint-core = { git = "https://github.com/fedimint/fedimint", rev = "183bff69f030b89f2cd78dbb91bdecf895048e3e" }
 fedimint-wallet-client = { git = "https://github.com/fedimint/fedimint", rev = "183bff69f030b89f2cd78dbb91bdecf895048e3e" }
@@ -22,6 +23,7 @@ leptos = { version = "0.4.8", features = ["csr"] }
 leptos-qr-scanner = { git = "https://github.com/elsirion/leptos-qr-scanner", rev = "75e976e99d9c1ed64921081a23f7da823d2a0b6d" }
 leptos_meta = { version = "0.4.8", features = ["csr"] }
 lightning-invoice = { version = "0.21.0", features = [ "serde" ] }
+qrcode-generator = "4.1.8"
 
 console_error_panic_hook = "0.1.7"
 tracing = "0.1.37"
