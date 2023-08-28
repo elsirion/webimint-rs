@@ -8,7 +8,7 @@ use fedimint_core::task::spawn;
 use fedimint_core::util::BoxStream;
 use fedimint_core::Amount;
 use fedimint_ln_client::{LightningClientExt, LightningClientGen, LightningMeta};
-use fedimint_mint_client::{parse_ecash, MintClientExt};
+use fedimint_mint_client::{MintClientExt, OOBNotes};
 use fedimint_mint_client::{MintClientGen, MintMeta, MintMetaVariants};
 use fedimint_wallet_client::WalletClientGen;
 use futures::StreamExt;
@@ -153,13 +153,19 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
                     .map_err(|_| warn!("RPC receiver dropped before response was sent"));
             }
             RpcRequest::Receive(notes) => {
-                let notes = notes.trim();
-                info!("Receiving notes: \"{notes}\"");
-                let notes = parse_ecash(notes).unwrap();
-                let amount = notes.total_amount();
-                client.reissue_external_notes(notes, ()).await.unwrap();
+                async fn receive_inner(
+                    client: &Client,
+                    notes: &str,
+                ) -> anyhow::Result<RpcResponse> {
+                    let notes = notes.trim();
+                    info!("Receiving notes: \"{notes}\"");
+                    let notes: OOBNotes = notes.parse()?;
+                    let amount = notes.total_amount();
+                    client.reissue_external_notes(notes, ()).await?;
+                    Ok(RpcResponse::Receive(amount))
+                }
                 let _ = response_sender
-                    .send(Ok(RpcResponse::Receive(amount)))
+                    .send(receive_inner(client, &notes).await)
                     .map_err(|_| warn!("RPC receiver dropped before response was sent"));
             }
             RpcRequest::LnSend(invoice) => {
