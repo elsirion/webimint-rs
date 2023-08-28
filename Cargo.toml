@@ -12,11 +12,11 @@ opt-level = 'z'
 async-trait = "0.1.68"
 anyhow = "1.0.71"
 base64 = "0.21.3"
-fedimint-client = { git = "https://github.com/fedimint/fedimint", rev = "183bff69f030b89f2cd78dbb91bdecf895048e3e" }
-fedimint-core = { git = "https://github.com/fedimint/fedimint", rev = "183bff69f030b89f2cd78dbb91bdecf895048e3e" }
-fedimint-wallet-client = { git = "https://github.com/fedimint/fedimint", rev = "183bff69f030b89f2cd78dbb91bdecf895048e3e" }
-fedimint-mint-client = { git = "https://github.com/fedimint/fedimint", rev = "183bff69f030b89f2cd78dbb91bdecf895048e3e" }
-fedimint-ln-client = { git = "https://github.com/fedimint/fedimint", rev = "183bff69f030b89f2cd78dbb91bdecf895048e3e" }
+fedimint-client = { git = "https://github.com/fedimint/fedimint", rev = "480ccb5cca9890bb3aa4cda41c7ff7d5d19fc357" }
+fedimint-core = { git = "https://github.com/fedimint/fedimint", rev = "480ccb5cca9890bb3aa4cda41c7ff7d5d19fc357" }
+fedimint-wallet-client = { git = "https://github.com/fedimint/fedimint", rev = "480ccb5cca9890bb3aa4cda41c7ff7d5d19fc357" }
+fedimint-mint-client = { git = "https://github.com/fedimint/fedimint", rev = "480ccb5cca9890bb3aa4cda41c7ff7d5d19fc357" }
+fedimint-ln-client = { git = "https://github.com/fedimint/fedimint", rev = "480ccb5cca9890bb3aa4cda41c7ff7d5d19fc357" }
 futures = "0.3.28"
 hex = "0.4.3"
 leptos = { version = "0.4.8", features = ["csr"] }
