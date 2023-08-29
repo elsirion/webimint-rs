@@ -11,12 +11,12 @@ PWA. There are still some bugs being worked out, but there is a demo available a
 
 ## Prerequisites
 
-Check out [Fedimint](https://github.com/fedimint/fedimint) at commit `183bff69f030b89f2cd78dbb91bdecf895048e3e`:
+Check out [Fedimint](https://github.com/fedimint/fedimint) at commit `480ccb5cca9890bb3aa4cda41c7ff7d5d19fc357`:
 
 ```shell
 git clone https://github.com/fedimint/fedimint
 cd fedimint
-git checkout 183bff69f030b89f2cd78dbb91bdecf895048e3e
+git checkout 480ccb5cca9890bb3aa4cda41c7ff7d5d19fc357
 ```
 
 Make sure you have [set up local dev environment](https://github.com/fedimint/fedimint/blob/master/docs/dev-env.md) needed to run `fedimint` locally
