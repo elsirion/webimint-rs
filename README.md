@@ -3,10 +3,13 @@
 # Fedimint Client built with [Leptos](https://github.com/leptos-rs/leptos)
 
 This repo contains a proof-of-concept of how to integrate `fedimint-client` with the Leptos web framework to build a
-PWA. There are still some bugs being worked out, but there is a demo available at https://fedimint-leptos.sirion.io/.
+PWA. There are still some bugs being worked out, but there is a demo available at https://webimint.sirion.io/.
+
+|<img src="screenshots/join.png" alt="Join federation screen">|<img src="screenshots/redeem.png" alt="Redeem e-cash screen">|<img src="screenshots/ln_send.png" alt="Lightning pay invoice screen">|
+----|----|----
+|<img src="screenshots/ln_receive_1.png" alt="Lightning generate invoice screen">|<img src="screenshots/ln_receive_2.png" alt="Lightning generated invoice was paid screen">|<img src="screenshots/tx_list.png" alt="List all transactions screen">|
 
 ## Prerequisites
-
 
 Check out [Fedimint](https://github.com/fedimint/fedimint) at commit `183bff69f030b89f2cd78dbb91bdecf895048e3e`:
 
@@ -75,8 +78,8 @@ fedimint-leptos-test$ trunk serve
 
 2. Open [http://127.0.0.1:8080](http://127.0.0.1:8080) in your browser
 
-3. Enter invite code into to input and submit. Check `Pre-requirements` above to see how to get it.
+3. Enter invite code into to input and submit. Check `Prerequisites` above to see how to get it.
 
-You should see "Starting client" in the browser and the JS console should be logging a lot:
+To see what's going on underneath open the browser console:
 
-![Screenshot of config fetching failing](screenshot.png)
+![Screenshot of logs shown in browser console](screenshots/console.png)
