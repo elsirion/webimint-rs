@@ -3,7 +3,7 @@ use leptos::*;
 use crate::context::ClientContext;
 
 use crate::components::{Balance, Receive, ReceiveLn, Send, TxList};
-use crate::utils::empty_view;
+use crate::utils::{empty_view, local_storage};
 
 #[derive(Clone, PartialEq)]
 enum Tab {
@@ -40,6 +40,11 @@ pub fn Joined(cx: Scope) -> impl IntoView {
     };
 
     let (tab, set_tab) = create_signal(cx, Tab::Receive);
+
+    // Once the federation is initialized, save its name to local storage for future reference
+    create_effect(cx, move |_| {
+        local_storage().set_item("federation_name", &federation_label()).ok();
+    });
 
     view! { cx,
       <h1 class="font-heading text-gray-900 text-4xl font-semibold">{federation_label}</h1>

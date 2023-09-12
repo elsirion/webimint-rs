@@ -1,8 +1,14 @@
+use crate::components::SubmitButton;
+use crate::utils::{empty_view, local_storage};
 use leptos::ev::KeyboardEvent;
 use leptos::*;
 use leptos_qr_scanner::Scan;
 
-use crate::components::SubmitButton;
+#[derive(Clone)]
+struct SavedFederation {
+    name: String,
+    code: String,
+}
 
 #[component]
 pub fn SubmitForm<F>(
@@ -12,6 +18,7 @@ pub fn SubmitForm<F>(
     description: String,
     submit_label: String,
     loading: ReadSignal<bool>,
+    #[prop(optional, into)] intro_screen: Option<bool>,
 ) -> impl IntoView
 where
     F: Fn(String) + 'static + Copy,
@@ -22,6 +29,10 @@ where
     let scan_disabled = Signal::derive(cx, move || loading.get());
 
     let (scan, set_scan) = create_signal(cx, false);
+
+    // The federation name and invite code saved to local storage
+    let (saved_federation, set_saved_federation) =
+        create_signal::<Option<SavedFederation>>(cx, None);
 
     let textarea = view! {cx,
         <textarea
@@ -60,6 +71,21 @@ where
         />
     };
 
+    // Load the saved federation name and invite code from local storage
+    create_effect(cx, move |_| {
+        let federation_name = local_storage().get_item("federation_name").unwrap();
+        let invite_code = local_storage().get_item("invite_code").unwrap();
+
+        if let Some(federation_name) = federation_name {
+            if let Some(invite_code) = invite_code {
+                set_saved_federation.set(Some(SavedFederation {
+                    name: federation_name,
+                    code: invite_code,
+                }));
+            }
+        }
+    });
+
     view! { cx,
       <form on:submit=|ev| ev.prevent_default()>
 
@@ -69,6 +95,26 @@ where
         fallback=move |_| textarea.clone()
       >
         {qr_scanner.clone()}
+      </Show>
+
+      // Display the saved federation retrieved from local storage
+      <Show
+        when=move || saved_federation.get().is_some() && intro_screen.is_some()
+        fallback=move |_| empty_view()
+        >
+        <div class="flex flex-col gap-2">
+          <span class="font-bold text-gray-500">"Or join an existing federation"</span>
+          <div
+            class="mb-8 flex flex-row gap-2 border border-gray-200 rounded p-2 items-center cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-colors"
+            on:click=move |_| {
+              set_value.set(saved_federation.get().unwrap().code.clone());
+            }
+          >
+            <span class="font-bold text-gray-700 text-2xl">{saved_federation.get().unwrap().name}</span>
+            <span>" - "</span>
+            <p class="text-gray-400 text-xl grow truncate">{saved_federation.get().unwrap().code}</p>
+          </div>
+        </div>
       </Show>
 
       <div class="flex space-x-4">

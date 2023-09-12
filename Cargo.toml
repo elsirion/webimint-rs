@@ -19,7 +19,7 @@ fedimint-mint-client = { git = "https://github.com/fedimint/fedimint", rev = "48
 fedimint-ln-client = { git = "https://github.com/fedimint/fedimint", rev = "480ccb5cca9890bb3aa4cda41c7ff7d5d19fc357" }
 futures = "0.3.28"
 hex = "0.4.3"
-leptos = { version = "0.4.8", features = ["csr"] }
+leptos = { version = "0.4.8", features = ["csr", "web-sys"] }
 leptos-qr-scanner = { git = "https://github.com/elsirion/leptos-qr-scanner", rev = "75e976e99d9c1ed64921081a23f7da823d2a0b6d" }
 leptos_icons = { version = "0.0.15", features = ["macros", "BsLightningCharge", "FaCoinsSolid"] }
 leptos_meta = { version = "0.4.8", features = ["csr"] }
@@ -40,6 +40,7 @@ wasm-bindgen = "0.2.87"
 wasm-bindgen-futures = "0.4.37"
 
 rexie = "0.4.2"
+web-sys = { version = "0.3.64", features = ["console", "Window", "Storage"] }
 
 [patch.crates-io]
 secp256k1-zkp = { git = "https://github.com/dpc/rust-secp256k1-zkp/", branch = "sanket-pr" }
