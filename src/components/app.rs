@@ -37,7 +37,18 @@ pub fn App(cx: Scope) -> impl IntoView {
               <h1 class="font-heading text-gray-900 text-4xl font-semibold mb-6">"Join a Federation"</h1>
               <div class="bg-orange-100 border-l-4 border-orange-500 text-orange-700 p-4 mb-8" role="alert">
                 <p class="font-bold">Warning</p>
-                <p>This demo lacks persistent storage, reloading the bowser tab will reset all state and burn all deposited funds.</p>
+                <p> "This demo lacks persistent storage, reloading the bowser tab will reset all state and burn all deposited funds." </p>
+                <p
+                  class="mt-2"
+                >
+                  <a
+                    href="https://github.com/elsirion/webimint-rs/issues/31"
+                    class="underline text-orange-600 hover:text-orange-800"
+                    target="_blank"
+                  >
+                    "Want to fix this? Take a look at issue #31 😃"
+                  </a>
+                </p>
               </div>
               <SubmitForm
                 description="Enter invite code (i.e. fed11jpr3lgm8t…) to join a Federation".into()
