@@ -1,4 +1,4 @@
-use crate::components::{Footer, Joined, Logo, SubmitForm};
+use crate::components::{Footer, Joined, Logo, SubmitForm, WalletSelector};
 
 use crate::client::ClientRpc;
 use crate::context::provide_client_context;
@@ -11,16 +11,42 @@ use leptos_meta::Title;
 //
 #[component]
 pub fn App(cx: Scope) -> impl IntoView {
-    let join_action = create_action(cx, |invoice: &String| {
-        let invoice = invoice.clone();
-        async move {
-            let client = ClientRpc::new();
-            let result = client.join(invoice).await;
-            result.ok().map(|_| client)
-        }
+    let client = ClientRpc::new();
+    provide_client_context(cx, client.clone());
+
+    let res_client = client.clone();
+    let wallets_resource = create_resource(
+        cx,
+        || (),
+        move |()| {
+            let client = res_client.clone();
+            async move { client.list_wallets().await.ok() }
+        },
+    );
+
+    let action_client = client.clone();
+    let select_wallet_action = create_action(cx, move |wallet_name: &String| {
+        let wallet_name = wallet_name.clone();
+        let client = action_client.clone();
+        async move { client.select_wallet(wallet_name).await.ok() }
     });
 
-    let joined = move || join_action.value().get().is_some();
+    let join_action = create_action(cx, move |invite: &String| {
+        let invite = invite.clone();
+        let client = client.clone();
+        async move { client.join(invite).await.ok() }
+    });
+
+    let show_select_wallet = move || select_wallet_action.value().get().is_none();
+    let show_join = move || {
+        (select_wallet_action.value().get() == Some(Some(false)))
+            && join_action.value().get().is_none()
+    };
+    let show_wallet = move || {
+        let select_wallet = select_wallet_action.value().get();
+        select_wallet.is_some()
+            && (join_action.value().get().is_some() || select_wallet == Some(Some(true)))
+    };
 
     view! { cx,
       <Title text="Fedimint Web Client" />
@@ -31,25 +57,30 @@ pub fn App(cx: Scope) -> impl IntoView {
           </header>
           <main class="w-full pb-24 flex-grow ">
             <Show
-              when=move || !joined()
+              when=show_select_wallet
+                fallback=|_| empty_view()
+              >
+              {
+                  move || {
+                    if let Some(Some(wallets)) = wallets_resource.read(cx) {
+                      view! { cx,
+                        <WalletSelector
+                          available=wallets
+                          on_select=move |wallet_name| select_wallet_action.dispatch(wallet_name)
+                        />
+                      }.into_view(cx)
+                    } else {
+                      empty_view().into_view(cx)
+                    }
+                  }
+              }
+
+            </Show>
+            <Show
+              when=show_join
                 fallback=|_| empty_view()
               >
               <h1 class="font-heading text-gray-900 text-4xl font-semibold mb-6">"Join a Federation"</h1>
-              <div class="bg-orange-100 border-l-4 border-orange-500 text-orange-700 p-4 mb-8" role="alert">
-                <p class="font-bold">Warning</p>
-                <p> "This demo lacks persistent storage, reloading the bowser tab will reset all state and burn all deposited funds." </p>
-                <p
-                  class="mt-2"
-                >
-                  <a
-                    href="https://github.com/elsirion/webimint-rs/issues/31"
-                    class="underline text-orange-600 hover:text-orange-800"
-                    target="_blank"
-                  >
-                    "Want to fix this? Take a look at issue #31 😃"
-                  </a>
-                </p>
-              </div>
               <SubmitForm
                 description="Enter invite code (i.e. fed11jpr3lgm8t…) to join a Federation".into()
                 on_submit=move |value| join_action.dispatch(value)
@@ -57,24 +88,18 @@ pub fn App(cx: Scope) -> impl IntoView {
                 submit_label="Join".into()
                 loading=join_action.pending()
               />
-
             </Show>
 
             <Suspense
               fallback=move || view!{ cx, "Loading..."}
             >
             <ErrorBoundary fallback=|cx, error| view!{ cx, <p>{format!("Failed to create client: {:?}", error.get())}</p>}>
-            { move || {
-              join_action.value().get().flatten().map(|c| {
-                  // Create app context to provide ClientRpc
-                  // as soon as it's available
-                  provide_client_context(cx, c);
-
-                  view! { cx,
-                    <Joined />
-                  }
-                })
-              }}
+            <Show
+              when=show_wallet
+                fallback=|_| empty_view()
+              >
+              <Joined />
+            </Show>
             </ErrorBoundary>
             </Suspense>
           </main>
