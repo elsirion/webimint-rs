@@ -27,7 +27,7 @@ pub fn App(cx: Scope) -> impl IntoView {
       <div class="h-[100dvh]">
         <div class="mx-auto w-full h-full flex flex-col max-w-[600px] p-6">
           <header class="flex justify-center mb-20">
-            <Logo />
+            <Logo class="bg-red border-1 border-blue"/>
           </header>
           <main class="w-full pb-24 flex-grow ">
             <Show
