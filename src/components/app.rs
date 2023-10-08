@@ -10,8 +10,8 @@ use leptos_meta::Title;
 // App component
 //
 #[component]
-pub fn App(cx: Scope) -> impl IntoView {
-    let join_action = create_action(cx, |invoice: &String| {
+pub fn App() -> impl IntoView {
+    let join_action = create_action(|invoice: &String| {
         let invoice = invoice.clone();
         async move {
             let client = ClientRpc::new();
@@ -22,7 +22,7 @@ pub fn App(cx: Scope) -> impl IntoView {
 
     let joined = move || join_action.value().get().is_some();
 
-    view! { cx,
+    view! {
       <Title text="Fedimint Web Client" />
       <div class="h-[100dvh]">
         <div class="mx-auto w-full h-full flex flex-col max-w-[600px] p-6">
@@ -61,16 +61,16 @@ pub fn App(cx: Scope) -> impl IntoView {
             </Show>
 
             <Suspense
-              fallback=move || view!{ cx, "Loading..."}
+              fallback=move || view!{ "Loading..."}
             >
-            <ErrorBoundary fallback=|cx, error| view!{ cx, <p>{format!("Failed to create client: {:?}", error.get())}</p>}>
+            <ErrorBoundary fallback=|error| view!{ <p>{format!("Failed to create client: {:?}", error.get())}</p>}>
             { move || {
               join_action.value().get().flatten().map(|c| {
                   // Create app context to provide ClientRpc
                   // as soon as it's available
-                  provide_client_context(cx, c);
+                  provide_client_context(c);
 
-                  view! { cx,
+                  view! {
                     <Joined />
                   }
                 })

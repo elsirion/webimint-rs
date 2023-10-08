@@ -18,19 +18,18 @@ enum Tab {
 // First view whenever an user joined a Federation
 //
 #[component]
-pub fn Joined(cx: Scope) -> impl IntoView {
-    let ClientContext { client, .. } = expect_context::<ClientContext>(cx);
+pub fn Joined() -> impl IntoView {
+    let ClientContext { client, .. } = expect_context::<ClientContext>();
 
     // get name of the federation
     let name_resource = create_resource(
-        cx,
         || (),
         move |_| async move { client.get_value().get_name().await },
     );
 
     let federation_label = move || {
         name_resource
-            .read(cx)
+            .read()
             .map(|value| match value {
                 Err(error) => format!("Failed to get federation name {error:?}"),
                 Ok(value) => value,
@@ -39,9 +38,9 @@ pub fn Joined(cx: Scope) -> impl IntoView {
             .unwrap_or_else(|| "Loading...".into())
     };
 
-    let (tab, set_tab) = create_signal(cx, Tab::Receive);
+    let (tab, set_tab) = create_signal(Tab::Receive);
 
-    view! { cx,
+    view! {
       <h1 class="font-heading text-gray-900 text-4xl font-semibold">{federation_label}</h1>
       <Balance class="my-12" />
       <ul
