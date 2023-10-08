@@ -111,25 +111,25 @@ pub fn Joined() -> impl IntoView {
 
       <Show
           when=move || tab.get() == Tab::Send
-          fallback=|_| empty_view()
+          fallback=|| empty_view()
           >
           <Send />
       </Show>
       <Show
           when=move || tab.get() == Tab::Receive
-          fallback=|_| empty_view()
+          fallback=|| empty_view()
           >
           <Receive />
       </Show>
       <Show
           when=move || tab.get() == Tab::ReceiveLn
-          fallback=|_| empty_view()
+          fallback=|| empty_view()
           >
           <ReceiveLn />
       </Show>
       <Show
           when=move || tab.get() == Tab::TxList
-          fallback=|_| empty_view()
+          fallback=|| empty_view()
           >
           <TxList update_signal=move || {tab.get();} />
       </Show>

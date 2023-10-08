@@ -65,7 +65,7 @@ where
       <p class="font-body text-gray-600 text-xl">{description}</p>
       <Show
         when=move || scan.get()
-        fallback=move |_| textarea.clone()
+        fallback=move || textarea.clone()
       >
         {qr_scanner.clone()}
       </Show>

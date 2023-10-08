@@ -1,5 +1,6 @@
 use fedimint_core::Amount;
 use leptos::*;
+use leptos::logging::*;
 
 use crate::context::ClientContext;
 

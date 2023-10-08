@@ -35,7 +35,7 @@ where
                     </thead>
                     <tbody>
                     {move || {
-                        tx_list_resource.read().map(|transactions| {
+                        tx_list_resource.get().map(|transactions| {
                             transactions.into_iter()
                                 .map(|tx| {
                                     view! {<TxListRow transaction=tx />}
@@ -57,8 +57,8 @@ pub fn TxListRow(transaction: Transaction) -> impl IntoView {
             <td class="text-center p-4">
                 {
                     match transaction.operation_kind.as_ref() {
-                        "ln" => view! {<Icon icon=icon!(BsLightningCharge) width="2em" height="2em"/>}.into_view(),
-                        "mint" => view! {<Icon icon=icon!(FaCoinsSolid) width="2em" height="2em"/>}.into_view(),
+                        "ln" => view! {<Icon icon=icon!(BsLightningCharge) width="2em" height="2em"/>},
+                        "mint" => view! {<Icon icon=icon!(FaCoinsSolid) width="2em" height="2em"/>},
                         other => {
                             let kind = other.to_owned();
                             view! {<span>{kind}</span>}.into_view()

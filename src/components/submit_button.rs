@@ -24,7 +24,7 @@ where
         {children()}
         <Show
           when=move || loading.get()
-          fallback=move |_| empty_view()
+          fallback=move || empty_view()
         >
           <LoaderIcon class="ml-2" />
         </Show>

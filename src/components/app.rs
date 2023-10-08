@@ -32,7 +32,7 @@ pub fn App() -> impl IntoView {
           <main class="w-full pb-24 flex-grow ">
             <Show
               when=move || !joined()
-                fallback=|_| empty_view()
+                fallback=|| empty_view()
               >
               <h1 class="font-heading text-gray-900 text-4xl font-semibold mb-6">"Join a Federation"</h1>
               <div class="bg-orange-100 border-l-4 border-orange-500 text-orange-700 p-4 mb-8" role="alert">
