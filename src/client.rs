@@ -12,7 +12,7 @@ use fedimint_mint_client::{MintClientExt, OOBNotes};
 use fedimint_mint_client::{MintClientGen, MintMeta, MintMetaVariants};
 use fedimint_wallet_client::WalletClientGen;
 use futures::StreamExt;
-use leptos::warn;
+use leptos::logging::warn;
 use lightning_invoice::{Invoice, InvoiceDescription};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};

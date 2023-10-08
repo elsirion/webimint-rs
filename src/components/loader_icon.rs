@@ -1,8 +1,8 @@
 use leptos::*;
 
 #[component]
-pub fn LoaderIcon(cx: Scope, #[prop(optional, into)] class: String) -> impl IntoView {
-    view! { cx,
+pub fn LoaderIcon(#[prop(optional, into)] class: String) -> impl IntoView {
+    view! {
       <svg
       class={move || format!("h-5 w-5 animate-spin block {class}")}
       xmlns="http://www.w3.org/2000/svg"
