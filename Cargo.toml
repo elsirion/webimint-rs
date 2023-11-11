@@ -39,7 +39,7 @@ tokio-stream = "0.1.14"
 wasm-bindgen = "0.2.87"
 wasm-bindgen-futures = "0.4.37"
 
-rexie = "0.4.2"
+gloo-storage = "0.3.0"
 
 [patch.crates-io]
 secp256k1-zkp = { git = "https://github.com/dpc/rust-secp256k1-zkp/", branch = "sanket-pr" }

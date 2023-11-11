@@ -1,9 +1,10 @@
+use crate::db::PersistentMemDb;
 use anyhow;
 use fedimint_client::secret::PlainRootSecretStrategy;
 use fedimint_client::sm::OperationId;
 use fedimint_client::Client;
 use fedimint_core::api::InviteCode;
-use fedimint_core::db::mem_impl::MemDatabase;
+use fedimint_core::db::IDatabase;
 use fedimint_core::task::spawn;
 use fedimint_core::util::BoxStream;
 use fedimint_core::Amount;
@@ -24,6 +25,8 @@ use tracing::{debug, info};
 
 #[derive(Debug, Clone)]
 enum RpcRequest {
+    ListWallets,
+    SelectWallet(String),
     Join(String),
     GetName,
     SubscribeBalance,
@@ -35,6 +38,10 @@ enum RpcRequest {
 }
 
 enum RpcResponse {
+    ListWallets(Vec<String>),
+    SelectWallet {
+        initialized: bool,
+    },
     Join,
     GetName(String),
     SubscribeBalance(BoxStream<'static, Amount>),
@@ -80,11 +87,18 @@ impl From<anyhow::Error> for RpcError {
 type RpcCall = (RpcRequest, oneshot::Sender<anyhow::Result<RpcResponse>>);
 
 async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
-    let client = loop {
-        let (invite_code_str, response_sender) = match rpc.recv().await.expect("Sender not dropped")
+    // Open DB
+    let (wallet_db, joined) = loop {
+        let (wallet_db_name, response_sender) = match rpc.recv().await.expect("Sender not dropped")
         {
-            (RpcRequest::Join(invite_code_str), response_sender) => {
-                (invite_code_str, response_sender)
+            (RpcRequest::SelectWallet(wallet_db_name), response_sender) => {
+                (wallet_db_name, response_sender)
+            }
+            (RpcRequest::ListWallets, response_sender) => {
+                let _ = response_sender
+                    .send(Ok(RpcResponse::ListWallets(PersistentMemDb::list_dbs())))
+                    .map_err(|_| warn!("RPC receiver dropped before response was sent"));
+                continue;
             }
             (_, response_sender) => {
                 let _ = response_sender
@@ -96,41 +110,88 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
             }
         };
 
-        info!("Joining federation {}", invite_code_str);
-
-        let invite_code = match InviteCode::from_str(&invite_code_str) {
-            Ok(invite) => invite,
-            Err(e) => {
-                let _ = response_sender
-                    .send(Err(anyhow::anyhow!("Invalid invite code: {e:?}")))
-                    .map_err(|_| warn!("RPC receiver dropped before response was sent"));
-                continue;
-            }
+        info!("Opening Wallet DB {}", wallet_db_name);
+        let wallet_db = PersistentMemDb::new(wallet_db_name).await;
+        let joined = {
+            let mut dbtx = wallet_db.begin_transaction().await;
+            let mut stream = dbtx.raw_find_by_prefix(&[0x2f]).await.expect("DB error");
+            stream.next().await.is_some()
         };
 
+        let _ = response_sender
+            .send(Ok(RpcResponse::SelectWallet {
+                initialized: joined,
+            }))
+            .map_err(|_| warn!("RPC receiver dropped before response was sent"));
+
+        break (wallet_db, joined);
+    };
+
+    let client = if !joined {
+        loop {
+            let (invite_code_str, response_sender) =
+                match rpc.recv().await.expect("Sender not dropped") {
+                    (RpcRequest::Join(invite_code_str), response_sender) => {
+                        (invite_code_str, response_sender)
+                    }
+                    (_, response_sender) => {
+                        let _ = response_sender
+                            .send(Err(anyhow::anyhow!(
+                                "Invalid request, need to initialize client first"
+                            )))
+                            .map_err(|_| warn!("RPC receiver dropped before response was sent"));
+                        continue;
+                    }
+                };
+
+            info!("Joining federation {}", invite_code_str);
+
+            let invite_code = match InviteCode::from_str(&invite_code_str) {
+                Ok(invite) => invite,
+                Err(e) => {
+                    let _ = response_sender
+                        .send(Err(anyhow::anyhow!("Invalid invite code: {e:?}")))
+                        .map_err(|_| warn!("RPC receiver dropped before response was sent"));
+                    continue;
+                }
+            };
+
+            let mut client_builder = fedimint_client::Client::builder();
+            client_builder.with_module(WalletClientGen(None));
+            client_builder.with_module(MintClientGen);
+            client_builder.with_module(LightningClientGen);
+            client_builder.with_database(wallet_db.clone());
+            client_builder.with_primary_module(1);
+            client_builder.with_invite_code(invite_code);
+            let client_res = client_builder.build::<PlainRootSecretStrategy>().await;
+
+            match client_res {
+                Ok(client) => {
+                    let _ = response_sender
+                        .send(Ok(RpcResponse::Join))
+                        .map_err(|_| warn!("RPC receiver dropped before response was sent"));
+                    break client;
+                }
+                Err(e) => {
+                    let _ = response_sender
+                        .send(Err(anyhow::anyhow!("Failed to initialize client: {e:?}")))
+                        .map_err(|_| warn!("RPC receiver dropped before response was sent"));
+                    continue;
+                }
+            };
+        }
+    } else {
+        // TODO: dedup
         let mut client_builder = fedimint_client::Client::builder();
         client_builder.with_module(WalletClientGen(None));
         client_builder.with_module(MintClientGen);
         client_builder.with_module(LightningClientGen);
-        client_builder.with_database(MemDatabase::new());
+        client_builder.with_database(wallet_db);
         client_builder.with_primary_module(1);
-        client_builder.with_invite_code(invite_code);
-        let client_res = client_builder.build::<PlainRootSecretStrategy>().await;
-
-        match client_res {
-            Ok(client) => {
-                let _ = response_sender
-                    .send(Ok(RpcResponse::Join))
-                    .map_err(|_| warn!("RPC receiver dropped before response was sent"));
-                break client;
-            }
-            Err(e) => {
-                let _ = response_sender
-                    .send(Err(anyhow::anyhow!("Failed to initialize client: {e:?}")))
-                    .map_err(|_| warn!("RPC receiver dropped before response was sent"));
-                continue;
-            }
-        };
+        client_builder
+            .build::<PlainRootSecretStrategy>()
+            .await
+            .unwrap()
     };
 
     let client: &Client = Box::leak(Box::new(client));
@@ -415,6 +476,33 @@ impl ClientRpc {
         let response = response_receiver.await.expect("Client has stopped")?;
         match response {
             RpcResponse::ListTransactions(transactions) => Ok(transactions),
+            _ => Err(RpcError::InvalidResponse),
+        }
+    }
+
+    pub async fn list_wallets(&self) -> Result<Vec<String>, RpcError> {
+        let (response_sender, response_receiver) = oneshot::channel();
+        self.sender
+            .send((RpcRequest::ListWallets, response_sender))
+            .await
+            .expect("Client has stopped");
+        let response = response_receiver.await.expect("Client has stopped")?;
+        match response {
+            RpcResponse::ListWallets(wallets) => Ok(wallets),
+            _ => Err(RpcError::InvalidResponse),
+        }
+    }
+
+    /// Opens a wallet and returns whether it is initialized already. If false is returned an invite code has to be provided.
+    pub async fn select_wallet(&self, name: String) -> Result<bool, RpcError> {
+        let (response_sender, response_receiver) = oneshot::channel();
+        self.sender
+            .send((RpcRequest::SelectWallet(name), response_sender))
+            .await
+            .expect("Client has stopped");
+        let response = response_receiver.await.expect("Client has stopped")?;
+        match response {
+            RpcResponse::SelectWallet { initialized } => Ok(initialized),
             _ => Err(RpcError::InvalidResponse),
         }
     }
