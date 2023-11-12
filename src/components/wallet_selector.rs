@@ -38,6 +38,12 @@ where
           <p class="font-bold">Note</p>
           <p> "To switch wallets after selecting one just reload the web app." </p>
         </div>
+        <div class="bg-orange-100 border-l-4 border-orange-500 text-orange-700 p-4 mb-8" role="alert">
+          <p class="font-bold">Warning</p>
+          <p>
+            "Webimint is a highly experimental Fedimint wallet, use at your own risk. It's currently compatible with the 0.1 release of Fedimint."
+          </p>
+        </div>
         <h1 class="font-heading text-gray-900 text-4xl font-semibold mb-6">"Select a wallet:"</h1>
         <ul class="mb-6 list-disc">
           { available_list }
