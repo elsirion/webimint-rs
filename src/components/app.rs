@@ -109,7 +109,12 @@ pub fn App(cx: Scope) -> impl IntoView {
               fallback=|_| empty_view()
             >
               {move || view!{ cx, <p>{
-                format!("Failed to join federation: {:?}", join_action_error.with(|e| anyhow!("{:?}", e)))
+                format!("Failed to join federation: {:?}", join_action_error.with(|e_opt| {
+                  match e_opt {
+                    Some(e) => anyhow!("{:?}", e),
+                    None => anyhow!("")
+                  }
+                }))
               }</p>}}
             </Show>
 
