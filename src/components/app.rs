@@ -32,34 +32,37 @@ pub fn App(cx: Scope) -> impl IntoView {
         async move { client.select_wallet(wallet_name).await.ok() }
     });
 
-    let join_action_error = create_rw_signal(cx, None);
     let join_action = create_action(cx, move |invite: &String| {
         let invite = invite.clone();
         let client = client.clone();
-        async move { match client.join(invite).await {
-            Ok(v) => {
-                join_action_error.set(None);
-                Some(v)
-            }
-            Err(err) => {
-                join_action_error.set(Some(err));
-                None
-            }
-        }}
+        async move { client.join(invite).await }
     });
 
     let show_select_wallet = move || select_wallet_action.value().get().is_none();
     let show_join = move || {
         (select_wallet_action.value().get() == Some(Some(false)))
-        && join_action.value().get().is_none()
+        && join_action.value().with(|r| r.is_none())
     };
     let show_join_error = move || {
-        join_action_error.with(|err| err.is_some())
+        join_action.value().with(|r| {
+            if let Some(Err(_)) = r {
+                true
+            } else {
+                false
+            }
+        })
     };
     let show_wallet = move || {
         let select_wallet = select_wallet_action.value().get();
         select_wallet.is_some()
-            && (join_action.value().get() == Some(Some(())) || select_wallet == Some(Some(true)))
+            && (join_action.value().with(|r| {
+                if let Some(Ok(_)) = r {
+                    true
+                } else {
+                    false
+                }
+            }) 
+            || select_wallet == Some(Some(true)))
     };
 
     view! { cx,
@@ -109,10 +112,11 @@ pub fn App(cx: Scope) -> impl IntoView {
               fallback=|_| empty_view()
             >
               {move || view!{ cx, <p>{
-                format!("Failed to join federation: {:?}", join_action_error.with(|e_opt| {
-                  match e_opt {
-                    Some(e) => anyhow!("{:?}", e),
-                    None => anyhow!("")
+                format!("Failed to join federation: {:?}", join_action.value().with(|r| {
+                  if let Some(Err(e)) = r {
+                      anyhow!("{:?}", e)
+                  } else {
+                      anyhow!("")
                   }
                 }))
               }</p>}}
