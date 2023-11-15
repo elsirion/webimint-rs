@@ -3,9 +3,9 @@ use crate::components::{Footer, Joined, Logo, SubmitForm, WalletSelector};
 use crate::client::ClientRpc;
 use crate::context::provide_client_context;
 use crate::utils::empty_view;
+use anyhow::anyhow;
 use leptos::*;
 use leptos_meta::Title;
-use anyhow::anyhow;
 
 //
 // App component
@@ -41,28 +41,18 @@ pub fn App(cx: Scope) -> impl IntoView {
     let show_select_wallet = move || select_wallet_action.value().get().is_none();
     let show_join = move || {
         (select_wallet_action.value().get() == Some(Some(false)))
-        && join_action.value().with(|r| r.is_none())
+            && join_action
+                .value()
+                .with(|r| matches!(r, None | Some(Err(_))))
     };
-    let show_join_error = move || {
-        join_action.value().with(|r| {
-            if let Some(Err(_)) = r {
-                true
-            } else {
-                false
-            }
-        })
-    };
+    let show_join_error = move || join_action.value().with(|r| matches!(r, Some(Err(_))));
     let show_wallet = move || {
         let select_wallet = select_wallet_action.value().get();
         select_wallet.is_some()
-            && (join_action.value().with(|r| {
-                if let Some(Ok(_)) = r {
-                    true
-                } else {
-                    false
-                }
-            }) 
-            || select_wallet == Some(Some(true)))
+            && (join_action
+                .value()
+                .with(|r| if let Some(Ok(_)) = r { true } else { false })
+                || select_wallet == Some(Some(true)))
     };
 
     view! { cx,
@@ -106,24 +96,23 @@ pub fn App(cx: Scope) -> impl IntoView {
                 loading=join_action.pending()
               />
             </Show>
-              
+
             <Show
-              when=show_join_error 
+              when=show_join_error
               fallback=|_| empty_view()
             >
-              {move || view!{ cx, <p>{
-                format!("Failed to join federation: {:?}", join_action.value().with(|r| {
-                  if let Some(Err(e)) = r {
-                      anyhow!("{:?}", e)
-                  } else {
-                      anyhow!("")
+              {move || view!{ cx, <div class="text-body text-md mt-4"><span class="text-red-500">{
+                format!("✗ Failed to join federation: {:?}", join_action.value().with(|r| {
+                  match r {
+                    Some(Err(e)) =>anyhow!("{:?}", e),
+                    _ => anyhow!("")
                   }
                 }))
-              }</p>}}
+              }</span></div>}}
             </Show>
 
             <Show
-              when=show_wallet 
+              when=show_wallet
               fallback=|_| empty_view()
             >
               <Joined />
