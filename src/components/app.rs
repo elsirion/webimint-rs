@@ -5,6 +5,7 @@ use crate::context::provide_client_context;
 use crate::utils::empty_view;
 use leptos::*;
 use leptos_meta::Title;
+use anyhow::anyhow;
 
 //
 // App component
@@ -34,18 +35,34 @@ pub fn App(cx: Scope) -> impl IntoView {
     let join_action = create_action(cx, move |invite: &String| {
         let invite = invite.clone();
         let client = client.clone();
-        async move { client.join(invite).await.ok() }
+        async move { client.join(invite).await }
     });
 
     let show_select_wallet = move || select_wallet_action.value().get().is_none();
     let show_join = move || {
         (select_wallet_action.value().get() == Some(Some(false)))
-            && join_action.value().get().is_none()
+        && join_action.value().with(|r| r.is_none())
+    };
+    let show_join_error = move || {
+        join_action.value().with(|r| {
+            if let Some(Err(_)) = r {
+                true
+            } else {
+                false
+            }
+        })
     };
     let show_wallet = move || {
         let select_wallet = select_wallet_action.value().get();
         select_wallet.is_some()
-            && (join_action.value().get().is_some() || select_wallet == Some(Some(true)))
+            && (join_action.value().with(|r| {
+                if let Some(Ok(_)) = r {
+                    true
+                } else {
+                    false
+                }
+            }) 
+            || select_wallet == Some(Some(true)))
     };
 
     view! { cx,
@@ -89,19 +106,28 @@ pub fn App(cx: Scope) -> impl IntoView {
                 loading=join_action.pending()
               />
             </Show>
-
-            <Suspense
-              fallback=move || view!{ cx, "Loading..."}
-            >
-            <ErrorBoundary fallback=|cx, error| view!{ cx, <p>{format!("Failed to create client: {:?}", error.get())}</p>}>
+              
             <Show
-              when=show_wallet
-                fallback=|_| empty_view()
-              >
+              when=show_join_error 
+              fallback=|_| empty_view()
+            >
+              {move || view!{ cx, <p>{
+                format!("Failed to join federation: {:?}", join_action.value().with(|r| {
+                  if let Some(Err(e)) = r {
+                      anyhow!("{:?}", e)
+                  } else {
+                      anyhow!("")
+                  }
+                }))
+              }</p>}}
+            </Show>
+
+            <Show
+              when=show_wallet 
+              fallback=|_| empty_view()
+            >
               <Joined />
             </Show>
-            </ErrorBoundary>
-            </Suspense>
           </main>
           <Footer class="w-full py-2" />
         </div>
