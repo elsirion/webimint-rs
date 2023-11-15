@@ -49,9 +49,7 @@ pub fn App(cx: Scope) -> impl IntoView {
     let show_wallet = move || {
         let select_wallet = select_wallet_action.value().get();
         select_wallet.is_some()
-            && (join_action
-                .value()
-                .with(|r| if let Some(Ok(_)) = r { true } else { false })
+            && (join_action.value().with(|r| matches!(r, Some(Ok(_))))
                 || select_wallet == Some(Some(true)))
     };
 
