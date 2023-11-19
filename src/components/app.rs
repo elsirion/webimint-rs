@@ -5,7 +5,7 @@ use crate::context::provide_client_context;
 use crate::utils::empty_view;
 use anyhow::anyhow;
 use leptos::*;
-use leptos_meta::Title;
+use leptos_meta::{Title, Meta, Link};
 
 //
 // App component
@@ -54,9 +54,17 @@ pub fn App(cx: Scope) -> impl IntoView {
     };
 
     view! { cx,
-      <Title text="Fedimint Web Client" />
+      <Title text="Webimint" />
+      <Meta name="viewport" content="width=device-width, initial-scale=0.75, user-scalable=0, interactive-widget=overlays-content" />
+      <Link rel="icon" type_="image/png" sizes="192x192" href="/assets/icons/android-icon-192x192.png" />
+      <Link rel="icon" type_="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png" />
+      <Link rel="icon" type_="image/png" sizes="96x96" href="/assets/icons/favicon-96x96.png" />
+      <Link rel="icon" type_="image/png" sizes="16x16" href="/assets/icons/favicon-16x16.png" />
+      <Link rel="manifest" href="/assets/manifest.json" />
+      <Meta name="theme-color" content="#ffffff" />
+
       <div class="h-[100dvh]">
-        <div class="mx-auto w-full h-full flex flex-col max-w-[600px] p-6">
+        <div class="mx-auto w-full h-full flex flex-col lg:max-w-[600px] p-6">
           <header class="flex justify-center mb-20">
             <Logo class="bg-red border-1 border-blue"/>
           </header>
