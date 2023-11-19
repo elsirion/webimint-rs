@@ -5,7 +5,7 @@ use crate::context::provide_client_context;
 use crate::utils::empty_view;
 use anyhow::anyhow;
 use leptos::*;
-use leptos_meta::Title;
+use leptos_meta::{Title, Meta};
 
 //
 // App component
@@ -55,8 +55,9 @@ pub fn App(cx: Scope) -> impl IntoView {
 
     view! { cx,
       <Title text="Fedimint Web Client" />
+      <Meta name="viewport" content="width=device-width, initial-scale=0.75, user-scalable=0, interactive-widget=overlays-content" />
       <div class="h-[100dvh]">
-        <div class="mx-auto w-full h-full flex flex-col max-w-[600px] p-6">
+        <div class="mx-auto w-full h-full flex flex-col lg:max-w-[600px] p-6">
           <header class="flex justify-center mb-20">
             <Logo class="bg-red border-1 border-blue"/>
           </header>
