@@ -54,7 +54,7 @@ pub fn App(cx: Scope) -> impl IntoView {
     };
 
     view! { cx,
-      <Title text="Fedimint Web Client" />
+      <Title text="Webimint" />
       <Meta name="viewport" content="width=device-width, initial-scale=0.75, user-scalable=0, interactive-widget=overlays-content" />
       <div class="h-[100dvh]">
         <div class="mx-auto w-full h-full flex flex-col lg:max-w-[600px] p-6">
