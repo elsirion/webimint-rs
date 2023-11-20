@@ -6,12 +6,17 @@ use crate::utils::empty_view;
 use anyhow::anyhow;
 use leptos::*;
 use leptos_meta::{Title, Meta, Link};
+use leptos::SignalGet;
+use tracing::info;
+use crate::components::service_worker::ServiceWorker;
 
 //
 // App component
 //
 #[component]
 pub fn App(cx: Scope) -> impl IntoView {
+    info!("Starting app...");
+
     let client = ClientRpc::new();
     provide_client_context(cx, client.clone());
 
@@ -54,13 +59,15 @@ pub fn App(cx: Scope) -> impl IntoView {
     };
 
     view! { cx,
+      <ServiceWorker path="./service-worker.js" />
+
       <Title text="Webimint" />
       <Meta name="viewport" content="width=device-width, initial-scale=0.75, user-scalable=0, interactive-widget=overlays-content" />
       <Link rel="icon" type_="image/png" sizes="192x192" href="/assets/icons/android-icon-192x192.png" />
       <Link rel="icon" type_="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png" />
       <Link rel="icon" type_="image/png" sizes="96x96" href="/assets/icons/favicon-96x96.png" />
       <Link rel="icon" type_="image/png" sizes="16x16" href="/assets/icons/favicon-16x16.png" />
-      <Link rel="manifest" href="/assets/manifest.json" />
+      <Link rel="manifest" href="/manifest.json" />
       <Meta name="theme-color" content="#ffffff" />
 
       <div class="h-[100dvh]">
