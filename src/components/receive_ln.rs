@@ -12,7 +12,6 @@ use leptos::*;
 pub fn ReceiveLn(cx: Scope) -> impl IntoView {
     let ClientContext { client, .. } = expect_context::<ClientContext>(cx);
 
-    let client = client.clone();
     let submit_action = create_action(cx, move |(amount_msat, description): &(u64, String)| {
         let description = description.clone();
         let amount_msat = *amount_msat;

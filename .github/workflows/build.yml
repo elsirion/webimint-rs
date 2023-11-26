@@ -25,6 +25,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Build app
+        env:
+          FEDIMINT_BUILD_FORCE_GIT_HASH: ${{ github.sha }}
         run: nix develop --command bash -c 'npm i && trunk build --release'
 
       - name: Deploy app

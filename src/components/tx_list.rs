@@ -11,7 +11,7 @@ use crate::context::ClientContext;
 #[component]
 pub fn TxList<F>(cx: Scope, update_signal: F) -> impl IntoView
 where
-    F: Fn() -> () + Copy + 'static,
+    F: Fn() + Copy + 'static,
 {
     let ClientContext { client, .. } = expect_context::<ClientContext>(cx);
 

@@ -1,26 +1,26 @@
 use crate::db::PersistentMemDb;
-use anyhow;
-use fedimint_client::secret::PlainRootSecretStrategy;
-use fedimint_client::sm::OperationId;
-use fedimint_client::Client;
+use fedimint_client::secret::{PlainRootSecretStrategy, RootSecretStrategy};
+use fedimint_core::core::OperationId;
+use fedimint_client::{Client, FederationInfo};
 use fedimint_core::api::InviteCode;
-use fedimint_core::db::IDatabase;
+use fedimint_core::db::{IRawDatabase};
 use fedimint_core::task::spawn;
 use fedimint_core::util::BoxStream;
 use fedimint_core::Amount;
-use fedimint_ln_client::{LightningClientExt, LightningClientGen, LightningMeta};
-use fedimint_mint_client::{MintClientExt, OOBNotes};
-use fedimint_mint_client::{MintClientGen, MintMeta, MintMetaVariants};
-use fedimint_wallet_client::WalletClientGen;
+use fedimint_ln_client::{LightningClientInit, LightningClientModule, LightningOperationMeta, LightningOperationMetaPay, LightningOperationMetaVariant};
+use fedimint_wallet_client::WalletClientInit;
 use futures::StreamExt;
 use leptos::warn;
-use lightning_invoice::{Invoice, InvoiceDescription};
+use lightning_invoice::{Bolt11Invoice, Bolt11InvoiceDescription};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
 use std::str::FromStr;
 use std::time::SystemTime;
+use fedimint_mint_client::{MintClientInit, MintClientModule, MintOperationMeta, MintOperationMetaVariant, OOBNotes};
 use thiserror::Error as ThisError;
 use tokio::sync::{mpsc, oneshot, watch};
+use fedimint_core::db::IDatabaseTransactionOpsCore;
+use rand::thread_rng;
 use tracing::{debug, info};
 
 #[derive(Debug, Clone)]
@@ -157,13 +157,30 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
             };
 
             let mut client_builder = fedimint_client::Client::builder();
-            client_builder.with_module(WalletClientGen(None));
-            client_builder.with_module(MintClientGen);
-            client_builder.with_module(LightningClientGen);
-            client_builder.with_database(wallet_db.clone());
+            client_builder.with_database(wallet_db.clone().into());
+
+            let client_secret = match client_builder
+                .load_decodable_client_secret::<[u8; 64]>()
+                .await
+            {
+                Ok(secret) => secret,
+                Err(_) => {
+                    info!("Generating secret and writing to client storage");
+                    let secret = PlainRootSecretStrategy::random(&mut thread_rng());
+                    client_builder
+                        .store_encodable_client_secret(secret)
+                        .await
+                        .expect("Failed to store client secret");
+                    secret
+                }
+            };
+
+            client_builder.with_module(WalletClientInit(None));
+            client_builder.with_module(MintClientInit);
+            client_builder.with_module(LightningClientInit);
             client_builder.with_primary_module(1);
-            client_builder.with_invite_code(invite_code);
-            let client_res = client_builder.build::<PlainRootSecretStrategy>().await;
+            client_builder.with_federation_info(FederationInfo::from_invite_code(invite_code).await.unwrap());
+            let client_res = client_builder.build(PlainRootSecretStrategy::to_root_secret(&client_secret)).await;
 
             match client_res {
                 Ok(client) => {
@@ -183,13 +200,30 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
     } else {
         // TODO: dedup
         let mut client_builder = fedimint_client::Client::builder();
-        client_builder.with_module(WalletClientGen(None));
-        client_builder.with_module(MintClientGen);
-        client_builder.with_module(LightningClientGen);
-        client_builder.with_database(wallet_db);
+        client_builder.with_database(wallet_db.into());
+
+        let client_secret = match client_builder
+            .load_decodable_client_secret::<[u8; 64]>()
+            .await
+        {
+            Ok(secret) => secret,
+            Err(_) => {
+                info!("Generating secret and writing to client storage");
+                let secret = PlainRootSecretStrategy::random(&mut thread_rng());
+                client_builder
+                    .store_encodable_client_secret(secret)
+                    .await
+                    .expect("Failed to store client secret");
+                secret
+            }
+        };
+
+        client_builder.with_module(WalletClientInit(None));
+        client_builder.with_module(MintClientInit);
+        client_builder.with_module(LightningClientInit);
         client_builder.with_primary_module(1);
         client_builder
-            .build::<PlainRootSecretStrategy>()
+            .build(PlainRootSecretStrategy::to_root_secret(&client_secret))
             .await
             .unwrap()
     };
@@ -222,7 +256,7 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
                     info!("Receiving notes: \"{notes}\"");
                     let notes: OOBNotes = notes.parse()?;
                     let amount = notes.total_amount();
-                    client.reissue_external_notes(notes, ()).await?;
+                    client.get_first_module::<MintClientModule>().reissue_external_notes(notes, ()).await?;
                     Ok(RpcResponse::Receive(amount))
                 }
                 let _ = response_sender
@@ -230,7 +264,7 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
                     .map_err(|_| warn!("RPC receiver dropped before response was sent"));
             }
             RpcRequest::LnSend(invoice) => {
-                let invoice = match Invoice::from_str(&invoice) {
+                let invoice = match Bolt11Invoice::from_str(&invoice) {
                     Ok(invoice) => invoice,
                     Err(e) => {
                         let _ = response_sender
@@ -243,7 +277,8 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
                 let _ = response_sender
                     .send(
                         client
-                            .pay_bolt11_invoice(invoice)
+                            .get_first_module::<LightningClientModule>()
+                            .pay_bolt11_invoice(invoice, ())
                             .await
                             .map(|_| RpcResponse::LnSend),
                     )
@@ -253,8 +288,8 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
                 amount,
                 description,
             } => {
-                let (operation_id, invoice) = match client
-                    .create_bolt11_invoice(amount, description, None)
+                let (operation_id, invoice) = match client.get_first_module::<LightningClientModule>()
+                    .create_bolt11_invoice(amount, description, None, ())
                     .await
                 {
                     Ok(res) => res,
@@ -267,12 +302,12 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
                 };
 
                 let (await_paid_sender, await_paid_receiver) = watch::channel(false);
-                let mut subscription = client
+                let mut subscription = client.get_first_module::<LightningClientModule>()
                     .subscribe_ln_receive(operation_id)
                     .await
                     .expect("subscribing to a just created operation can't fail")
                     .into_stream();
-                spawn(async move {
+                spawn("waiting for invoice being paid", async move {
                     while let Some(state) = subscription.next().await {
                         if state == fedimint_ln_client::LnReceiveState::Funded {
                             let _ = await_paid_sender.send(true);
@@ -294,44 +329,44 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
                     .await
                     .into_iter()
                     .map(|(key, op_log)| {
-                        let (amount_msat, description) = match op_log.operation_type() {
+                        let (amount_msat, description) = match op_log.operation_module_kind() {
                             "mint" => {
-                                let meta = op_log.meta::<MintMeta>();
+                                let meta = op_log.meta::<MintOperationMeta>();
                                 match meta.variant {
-                                    MintMetaVariants::Reissuance { .. } => {
+                                    MintOperationMetaVariant::Reissuance { .. } => {
                                         (meta.amount.msats as i64, None)
                                     }
-                                    MintMetaVariants::SpendOOB { .. } => {
+                                    MintOperationMetaVariant::SpendOOB { .. } => {
                                         (-(meta.amount.msats as i64), None)
                                     }
                                 }
                             }
-                            "ln" => match op_log.meta::<LightningMeta>() {
-                                LightningMeta::Receive { invoice, .. } => {
+                            "ln" => match op_log.meta::<LightningOperationMeta>().variant {
+                                LightningOperationMetaVariant::Receive { invoice, .. } => {
                                     let amount = invoice
                                         .amount_milli_satoshis()
                                         .expect("We don't create 0 amount invoices")
                                         as i64;
                                     let description = match invoice.description() {
-                                        InvoiceDescription::Direct(description) => {
+                                        Bolt11InvoiceDescription::Direct(description) => {
                                             Some(description.to_string())
                                         }
-                                        InvoiceDescription::Hash(_) => None,
+                                        Bolt11InvoiceDescription::Hash(_) => None,
                                     };
 
                                     (amount, description)
                                 }
-                                LightningMeta::Pay { invoice, .. } => {
+                                LightningOperationMetaVariant::Pay(LightningOperationMetaPay {invoice, ..}) => {
                                     // TODO: add fee
                                     let amount = -(invoice
                                         .amount_milli_satoshis()
                                         .expect("Can't pay 0 amount invoices")
                                         as i64);
                                     let description = match invoice.description() {
-                                        InvoiceDescription::Direct(description) => {
+                                        Bolt11InvoiceDescription::Direct(description) => {
                                             Some(description.to_string())
                                         }
-                                        InvoiceDescription::Hash(_) => None,
+                                        Bolt11InvoiceDescription::Hash(_) => None,
                                     };
 
                                     (amount, description)
@@ -343,7 +378,7 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
                         Transaction {
                             timestamp: key.creation_time,
                             operation_id: key.operation_id,
-                            operation_kind: op_log.operation_type().to_owned(),
+                            operation_kind: op_log.operation_module_kind().to_owned(),
                             amount_msat,
                             description,
                         }
