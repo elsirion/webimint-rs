@@ -10,7 +10,6 @@ use crate::context::ClientContext;
 pub fn Receive(cx: Scope) -> impl IntoView {
     let ClientContext { client, .. } = expect_context::<ClientContext>(cx);
 
-    let client = client.clone();
     let submit_action = create_action(cx, move |invoice: &String| {
         let invoice = invoice.clone();
         async move { client.get_value().receive(invoice).await }

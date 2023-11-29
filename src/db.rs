@@ -1,7 +1,7 @@
 use anyhow::Result;
-use fedimint_core::db::mem_impl::MemDatabase;
-use fedimint_core::db::IDatabaseTransactionOps;
-use fedimint_core::db::{IDatabase, ISingleUseDatabaseTransaction, PrefixStream};
+use fedimint_core::db::mem_impl::{MemDatabase, MemTransaction};
+use fedimint_core::db::{IDatabaseTransactionOps, IDatabaseTransactionOpsCore, IRawDatabase, IRawDatabaseTransaction};
+use fedimint_core::db::{PrefixStream};
 use fedimint_core::module::__reexports::serde_json;
 use fedimint_core::{apply, async_trait_maybe_send};
 use std::collections::BTreeMap;
@@ -44,51 +44,27 @@ impl PersistentMemDb {
     pub fn list_dbs() -> Vec<String> {
         gloo_storage::LocalStorage::get_all::<BTreeMap<String, serde_json::Value>>()
             .unwrap()
-            .into_iter()
-            .map(|(key, _)| key)
+            .into_keys()
             .collect()
     }
 }
 
 #[apply(async_trait_maybe_send!)]
-impl IDatabase for PersistentMemDb {
-    async fn begin_transaction<'a>(&'a self) -> Box<dyn ISingleUseDatabaseTransaction<'a>> {
-        Box::new(PersistentMemDbTransaction(
+impl IRawDatabase for PersistentMemDb {
+    type Transaction<'a> = PersistentMemDbTransaction<'a>;
+
+    async fn begin_transaction<'a>(&'a self) -> PersistentMemDbTransaction<'a> {
+        PersistentMemDbTransaction(
             self.0.begin_transaction().await,
             self.1.clone(),
-        ))
+        )
     }
 }
 
-pub struct PersistentMemDbTransaction<'a>(Box<dyn ISingleUseDatabaseTransaction<'a>>, String);
+pub struct PersistentMemDbTransaction<'a>(MemTransaction<'a>, String);
 
 #[apply(async_trait_maybe_send!)]
-impl<'a> ISingleUseDatabaseTransaction<'a> for PersistentMemDbTransaction<'a> {
-    async fn commit_tx(&mut self) -> Result<()> {
-        let dump = self
-            .0
-            .raw_find_by_prefix(&[])
-            .await
-            .expect("Dumping DB failed")
-            .collect::<Vec<(Vec<u8>, Vec<u8>)>>()
-            .await;
-        self.0.commit_tx().await?;
-
-        info!("Writing DB dump of {} kv pairs", dump.len());
-
-        // FIXME: more compact format
-        gloo_storage::LocalStorage::set(&self.1, dump).expect("Could not store DB");
-
-        Ok(())
-    }
-
-    fn add_notification_key(&mut self, key: &[u8]) -> Result<()> {
-        self.0.add_notification_key(key)
-    }
-}
-
-#[apply(async_trait_maybe_send!)]
-impl<'a> IDatabaseTransactionOps<'a> for PersistentMemDbTransaction<'a> {
+impl<'a> IDatabaseTransactionOpsCore for PersistentMemDbTransaction<'a> {
     async fn raw_insert_bytes(
         &mut self,
         key: &[u8],
@@ -121,12 +97,36 @@ impl<'a> IDatabaseTransactionOps<'a> for PersistentMemDbTransaction<'a> {
     async fn raw_remove_by_prefix(&mut self, key_prefix: &[u8]) -> Result<()> {
         self.0.raw_remove_by_prefix(key_prefix).await
     }
+}
+
+#[apply(async_trait_maybe_send!)]
+impl<'a> IDatabaseTransactionOps for PersistentMemDbTransaction<'a> {
+    async fn set_tx_savepoint(&mut self) -> anyhow::Result<()> {
+        self.0.set_tx_savepoint().await
+    }
 
     async fn rollback_tx_to_savepoint(&mut self) -> anyhow::Result<()> {
         self.0.rollback_tx_to_savepoint().await
     }
+}
 
-    async fn set_tx_savepoint(&mut self) -> anyhow::Result<()> {
-        self.0.set_tx_savepoint().await
+#[apply(async_trait_maybe_send!)]
+impl<'a> IRawDatabaseTransaction for PersistentMemDbTransaction<'a> {
+    async fn commit_tx(mut self) -> Result<()> {
+        let dump = self
+            .0
+            .raw_find_by_prefix(&[])
+            .await
+            .expect("Dumping DB failed")
+            .collect::<Vec<(Vec<u8>, Vec<u8>)>>()
+            .await;
+        self.0.commit_tx().await?;
+
+        info!("Writing DB dump of {} kv pairs", dump.len());
+
+        // FIXME: more compact format
+        gloo_storage::LocalStorage::set(&self.1, dump).expect("Could not store DB");
+
+        Ok(())
     }
 }

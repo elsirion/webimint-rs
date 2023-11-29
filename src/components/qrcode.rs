@@ -10,7 +10,7 @@ pub fn QrCode(
     let qr_image_size = qr_image_size.unwrap_or(1024);
     let qr_data_url = move || {
         let png_bytes = qrcode_generator::to_png_to_vec_from_str(
-            &data.get(),
+            data.get(),
             qrcode_generator::QrCodeEcc::Medium,
             qr_image_size,
         )
