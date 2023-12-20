@@ -859,6 +859,7 @@ dependencies = [
  "async-trait",
  "base64 0.21.3",
  "console_error_panic_hook",
+ "fedimint-build",
  "fedimint-client",
  "fedimint-core",
  "fedimint-ln-client",
@@ -2713,13 +2714,15 @@ dependencies = [
 [[package]]
 name = "ring"
 version = "0.16.20"
-source = "git+https://github.com/dpc/ring?rev=5493e7e76d0d8fb1d3cbb0be9c4944700741b802#5493e7e76d0d8fb1d3cbb0be9c4944700741b802"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3053cf52e236a3ed746dfc745aa9cacf1b791d846bdaf412f60a8d7d6e17c8fc"
 dependencies = [
  "cc",
  "libc",
  "once_cell",
  "spin 0.5.2",
  "untrusted 0.7.1",
+ "web-sys",
  "winapi",
 ]
 
@@ -2907,7 +2910,8 @@ dependencies = [
 [[package]]
 name = "secp256k1-zkp"
 version = "0.7.0"
-source = "git+https://github.com/dpc/rust-secp256k1-zkp/?branch=sanket-pr#f29b1b8c442d4b8a42547ce36d3987aaedf94224"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fd403e9f0569b4131ab3fc9fa24a17775331b39382efd2cde851fdca655e3520"
 dependencies = [
  "rand",
  "secp256k1 0.24.3",
@@ -2918,7 +2922,8 @@ dependencies = [
 [[package]]
 name = "secp256k1-zkp-sys"
 version = "0.7.0"
-source = "git+https://github.com/dpc/rust-secp256k1-zkp/?branch=sanket-pr#f29b1b8c442d4b8a42547ce36d3987aaedf94224"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "64e7a2beac087c1da2d21018a3b7f043fe2f138654ad9c1518d409061a4a0034"
 dependencies = [
  "cc",
  "secp256k1-sys 0.6.1",

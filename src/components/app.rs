@@ -15,7 +15,9 @@ use crate::components::service_worker::ServiceWorker;
 //
 #[component]
 pub fn App(cx: Scope) -> impl IntoView {
-    info!("Starting app...");
+    pub const CODE_VERSION: &str = env!("FEDIMINT_BUILD_CODE_VERSION");
+
+    info!("Starting Webimint version {CODE_VERSION} ...");
 
     let client = ClientRpc::new();
     provide_client_context(cx, client.clone());
@@ -131,7 +133,10 @@ pub fn App(cx: Scope) -> impl IntoView {
               <Joined />
             </Show>
           </main>
-          <Footer class="w-full py-2" />
+          <Footer
+            class="w-full py-2"
+            version=CODE_VERSION
+          />
         </div>
       </div>
     }
