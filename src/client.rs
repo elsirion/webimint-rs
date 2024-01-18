@@ -1,30 +1,37 @@
 use crate::db::PersistentMemDb;
+use crate::prediction_markets::{PredictionMarketsRpcRequest, PredictionMarketsRpcResponse};
 use fedimint_client::secret::{PlainRootSecretStrategy, RootSecretStrategy};
-use fedimint_core::core::OperationId;
 use fedimint_client::{Client, FederationInfo};
 use fedimint_core::api::InviteCode;
-use fedimint_core::db::{IRawDatabase};
+use fedimint_core::core::OperationId;
+use fedimint_core::db::IDatabaseTransactionOpsCore;
+use fedimint_core::db::IRawDatabase;
 use fedimint_core::task::spawn;
 use fedimint_core::util::BoxStream;
 use fedimint_core::Amount;
-use fedimint_ln_client::{LightningClientInit, LightningClientModule, LightningOperationMeta, LightningOperationMetaPay, LightningOperationMetaVariant};
+use fedimint_ln_client::{
+    LightningClientInit, LightningClientModule, LightningOperationMeta, LightningOperationMetaPay,
+    LightningOperationMetaVariant,
+};
+use fedimint_mint_client::{
+    MintClientInit, MintClientModule, MintOperationMeta, MintOperationMetaVariant, OOBNotes,
+};
+use fedimint_prediction_markets_client::PredictionMarketsClientInit;
 use fedimint_wallet_client::WalletClientInit;
 use futures::StreamExt;
 use leptos::warn;
 use lightning_invoice::{Bolt11Invoice, Bolt11InvoiceDescription};
+use rand::thread_rng;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
 use std::str::FromStr;
 use std::time::SystemTime;
-use fedimint_mint_client::{MintClientInit, MintClientModule, MintOperationMeta, MintOperationMetaVariant, OOBNotes};
 use thiserror::Error as ThisError;
 use tokio::sync::{mpsc, oneshot, watch};
-use fedimint_core::db::IDatabaseTransactionOpsCore;
-use rand::thread_rng;
 use tracing::{debug, info};
 
 #[derive(Debug, Clone)]
-enum RpcRequest {
+pub enum RpcRequest {
     ListWallets,
     SelectWallet(String),
     Join(String),
@@ -35,9 +42,11 @@ enum RpcRequest {
     LnReceive { amount: Amount, description: String },
     // TODO: pagination
     ListTransactions,
+
+    PredictionMarkets(PredictionMarketsRpcRequest),
 }
 
-enum RpcResponse {
+pub enum RpcResponse {
     ListWallets(Vec<String>),
     SelectWallet {
         initialized: bool,
@@ -52,6 +61,8 @@ enum RpcResponse {
         await_paid: watch::Receiver<bool>,
     },
     ListTransactions(Vec<Transaction>),
+
+    PredictionMarkets(PredictionMarketsRpcResponse),
 }
 
 // TODO: add status update stream
@@ -178,9 +189,13 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
             client_builder.with_module(WalletClientInit(None));
             client_builder.with_module(MintClientInit);
             client_builder.with_module(LightningClientInit);
+            client_builder.with_module(PredictionMarketsClientInit);
             client_builder.with_primary_module(1);
-            client_builder.with_federation_info(FederationInfo::from_invite_code(invite_code).await.unwrap());
-            let client_res = client_builder.build(PlainRootSecretStrategy::to_root_secret(&client_secret)).await;
+            client_builder
+                .with_federation_info(FederationInfo::from_invite_code(invite_code).await.unwrap());
+            let client_res = client_builder
+                .build(PlainRootSecretStrategy::to_root_secret(&client_secret))
+                .await;
 
             match client_res {
                 Ok(client) => {
@@ -221,6 +236,7 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
         client_builder.with_module(WalletClientInit(None));
         client_builder.with_module(MintClientInit);
         client_builder.with_module(LightningClientInit);
+        client_builder.with_module(PredictionMarketsClientInit);
         client_builder.with_primary_module(1);
         client_builder
             .build(PlainRootSecretStrategy::to_root_secret(&client_secret))
@@ -256,7 +272,10 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
                     info!("Receiving notes: \"{notes}\"");
                     let notes: OOBNotes = notes.parse()?;
                     let amount = notes.total_amount();
-                    client.get_first_module::<MintClientModule>().reissue_external_notes(notes, ()).await?;
+                    client
+                        .get_first_module::<MintClientModule>()
+                        .reissue_external_notes(notes, ())
+                        .await?;
                     Ok(RpcResponse::Receive(amount))
                 }
                 let _ = response_sender
@@ -288,7 +307,8 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
                 amount,
                 description,
             } => {
-                let (operation_id, invoice) = match client.get_first_module::<LightningClientModule>()
+                let (operation_id, invoice) = match client
+                    .get_first_module::<LightningClientModule>()
                     .create_bolt11_invoice(amount, description, None, ())
                     .await
                 {
@@ -302,7 +322,8 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
                 };
 
                 let (await_paid_sender, await_paid_receiver) = watch::channel(false);
-                let mut subscription = client.get_first_module::<LightningClientModule>()
+                let mut subscription = client
+                    .get_first_module::<LightningClientModule>()
                     .subscribe_ln_receive(operation_id)
                     .await
                     .expect("subscribing to a just created operation can't fail")
@@ -356,7 +377,10 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
 
                                     (amount, description)
                                 }
-                                LightningOperationMetaVariant::Pay(LightningOperationMetaPay {invoice, ..}) => {
+                                LightningOperationMetaVariant::Pay(LightningOperationMetaPay {
+                                    invoice,
+                                    ..
+                                }) => {
                                     // TODO: add fee
                                     let amount = -(invoice
                                         .amount_milli_satoshis()
@@ -388,6 +412,8 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
                     .send(Ok(RpcResponse::ListTransactions(transactions)))
                     .map_err(|_| warn!("RPC receiver dropped before response was sent"));
             }
+            RpcRequest::PredictionMarkets(request) => request.handle(client, response_sender).await,
+
             req => {
                 let _ = response_sender
                     .send(Err(anyhow::anyhow!("Invalid request: {req:?}")))
@@ -401,7 +427,7 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
 
 #[derive(Clone)]
 pub struct ClientRpc {
-    sender: mpsc::Sender<RpcCall>,
+    pub sender: mpsc::Sender<RpcCall>,
 }
 
 impl ClientRpc {

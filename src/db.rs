@@ -1,7 +1,7 @@
 use anyhow::Result;
 use fedimint_core::db::mem_impl::{MemDatabase, MemTransaction};
 use fedimint_core::db::{IDatabaseTransactionOps, IDatabaseTransactionOpsCore, IRawDatabase, IRawDatabaseTransaction};
-use fedimint_core::db::{PrefixStream};
+use fedimint_core::db::PrefixStream;
 use fedimint_core::module::__reexports::serde_json;
 use fedimint_core::{apply, async_trait_maybe_send};
 use std::collections::BTreeMap;

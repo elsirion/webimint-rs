@@ -5,12 +5,15 @@ use crate::context::ClientContext;
 use crate::components::{Balance, Receive, ReceiveLn, Send, TxList};
 use crate::utils::empty_view;
 
+use crate::prediction_markets::components::PredictionMarketsHome;
+
 #[derive(Clone, PartialEq)]
 enum Tab {
     TxList,
     Send,
     ReceiveLn,
     Receive,
+    PredictionMarkets,
 }
 
 //
@@ -108,6 +111,20 @@ pub fn Joined(cx: Scope) -> impl IntoView {
             active = if tab.get() == Tab::ReceiveLn  {"text-blue-400 border-blue-400"} else {"text-gray-400 border-gray-200 hover:border-gray-700"} )}
           >LN Receive</button>
         </li>
+        <li class="flex-auto">
+          <button
+            on:click=move |_| {
+              set_tab.set(Tab::PredictionMarkets);
+            }
+            class={move || format!("my-2 block w-full text-center
+            border-b-2 
+            py-4
+            ease
+            font-body font-semibold  
+            text-xl leading-tight hover:text-blue-500 {active}", 
+            active = if tab.get() == Tab::PredictionMarkets  {"text-blue-400 border-blue-400"} else {"text-gray-400 border-gray-200 hover:border-gray-700"} )}
+          >Prediction Markets</button>
+        </li>
       </ul>
 
       <Show
@@ -134,6 +151,11 @@ pub fn Joined(cx: Scope) -> impl IntoView {
           >
           <TxList update_signal=move || {tab.get();} />
       </Show>
-
+      <Show
+          when=move || tab.get() == Tab::PredictionMarkets
+          fallback=|_| empty_view()
+          >
+          <PredictionMarketsHome />
+      </Show>
     }
 }

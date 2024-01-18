@@ -5,6 +5,8 @@ mod components;
 mod context;
 mod utils;
 
+mod prediction_markets;
+
 use components::App;
 
 use leptos::*;

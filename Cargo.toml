@@ -12,11 +12,13 @@ opt-level = 'z'
 async-trait = "0.1.68"
 anyhow = "1.0.71"
 base64 = "0.21.3"
-fedimint-client = "0.2.1-rc1"
-fedimint-core = "0.2.1-rc1"
-fedimint-wallet-client = "0.2.1-rc1"
-fedimint-mint-client = "0.2.1-rc1"
-fedimint-ln-client = "0.2.1-rc1"
+fedimint-client = { git = "https://github.com/fedimint/fedimint", tag = "v0.2.1" }
+fedimint-core = { git = "https://github.com/fedimint/fedimint", tag = "v0.2.1" }
+fedimint-wallet-client = { git = "https://github.com/fedimint/fedimint", tag = "v0.2.1" }
+fedimint-mint-client = { git = "https://github.com/fedimint/fedimint", tag = "v0.2.1" }
+fedimint-ln-client = { git = "https://github.com/fedimint/fedimint", tag = "v0.2.1" }
+fedimint-prediction-markets-common = { git = "https://github.com/Fedimint-Prediction-Markets/fedimint-prediction-markets" }
+fedimint-prediction-markets-client = { git = "https://github.com/Fedimint-Prediction-Markets/fedimint-prediction-markets" }
 futures = "0.3.28"
 hex = "0.4.3"
 leptos = { version = "0.4.8", features = ["csr"] }
@@ -41,6 +43,7 @@ wasm-bindgen-futures = "0.4.37"
 web-sys = { version = "0.3.65", features = [ "Navigator", "Window", "ServiceWorkerContainer" ] }
 gloo-storage = "0.3.0"
 rand = "0.8.5"
+secp256k1 = "0.24.3"
 
 [build-dependencies]
 fedimint-build = "0.2.1-rc1"
