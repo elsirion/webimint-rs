@@ -20,6 +20,7 @@ pub fn PayoutControlPublicKey(cx: Scope) -> impl IntoView {
     };
 
     view! { cx,
+        <p>client payout control</p>
         <div class="flex gap-3">
             <textarea readonly rows="1" class="flex-1 resize-none rounded p-3 bg-gray-100 border-gray-500">
                 {move || pk().unwrap_or("Loading...".into())}

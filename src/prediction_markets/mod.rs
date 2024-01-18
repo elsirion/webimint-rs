@@ -149,7 +149,7 @@ impl ClientRpc {
         candlestick_interval: Seconds,
         candlestick_timestamp: UnixTimestamp,
         candlestick_volume: ContractOfOutcomeAmount,
-    ) -> anyhow::Result<BTreeMap<UnixTimestamp, Candlestick>> {
+    ) -> anyhow::Result<BTreeMap<UnixTimestamp, Candlestick>, RpcError> {
         let (response_sender, response_receiver) = oneshot::channel();
         self.sender
             .send((
