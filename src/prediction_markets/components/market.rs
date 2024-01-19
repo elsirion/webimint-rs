@@ -26,7 +26,7 @@ pub fn Market(cx: Scope, market_outpoint: Memo<OutPoint>) -> impl IntoView
     let market = move || get_market_result().ok();
 
     let outcome = create_rw_signal(cx, Outcome::from(0));
-    let candlestick_interval = create_rw_signal(cx, Seconds::from(3600u64));
+    let candlestick_interval = create_rw_signal(cx, Seconds::from(60u64));
 
     view! { cx,
         <Show
@@ -34,7 +34,7 @@ pub fn Market(cx: Scope, market_outpoint: Memo<OutPoint>) -> impl IntoView
             fallback=|_| empty_view()
         >
             <h1 class="text-2xl">{market().map(|m| m.information.title)}</h1>
-            
+
             <table class="p-2 bor">
                 <thead>
                     <th>"Payout Control Public Key"</th>

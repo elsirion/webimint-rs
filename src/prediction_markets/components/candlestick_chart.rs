@@ -8,6 +8,7 @@ use leptos::*;
 use tracing::info;
 
 use crate::context::ClientContext;
+use crate::prediction_markets::js;
 
 #[component]
 pub fn CandlestickChart(
@@ -17,6 +18,8 @@ pub fn CandlestickChart(
     candlestick_interval: RwSignal<Seconds>,
 ) -> impl IntoView {
     let ClientContext { client, .. } = expect_context::<ClientContext>(cx);
+
+    let candlesticks_recieved = create_rw_signal(cx, Vec::new());
 
     let newest_candlestick_timestamp = create_rw_signal(cx, UnixTimestamp::ZERO);
     let newest_candlestick_volume = create_rw_signal(cx, ContractOfOutcomeAmount::ZERO);
@@ -56,27 +59,39 @@ pub fn CandlestickChart(
     });
 
     create_effect(cx, move |_| match candlestick_resource.read(cx) {
-        Some(Ok(c)) => {
-            if c.len() != 0 {
-                let newest_candlestick = c.last_key_value().unwrap();
+        Some(Ok(candlesticks)) => {
+            if candlesticks.len() != 0 {
+                for c in candlesticks.iter() {
+                    candlesticks_recieved.update(|cr| cr.push((c.0.to_owned(), c.1.to_owned())))
+                }
+
+                let newest_candlestick = candlesticks.last_key_value().unwrap();
                 newest_candlestick_timestamp.set(newest_candlestick.0.to_owned());
                 newest_candlestick_volume.set(newest_candlestick.1.volume.to_owned());
             }
 
             set_timeout(
                 move || candlestick_resource.refetch(),
-                Duration::from_millis(5000),
+                Duration::from_millis(600),
             );
 
-            info!("{:?}", c)
+            info!("{:?}", candlesticks)
         }
         _ => (),
     });
+
+    let mut chart_div = view! { cx, <div />};
+    chart_div = chart_div.id("chart");
+
+    // js::create_chart();
 
     view! {
         cx,
         {market_outpoint.get_untracked().to_string()}
         <br />
         {outcome}
+        <br />
+        {move || candlesticks_recieved.get().into_iter().map(|c| format!("timestamp: {:?}\n candlestick: {:?}\n\n", c.0, c.1)).collect_view(cx)}
+        {chart_div}
     }
 }
