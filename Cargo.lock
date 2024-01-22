@@ -1025,7 +1025,7 @@ dependencies = [
 [[package]]
 name = "fedimint-prediction-markets-client"
 version = "0.2.1"
-source = "git+https://github.com/Fedimint-Prediction-Markets/fedimint-prediction-markets#df7f3306d79bf73769992f7c177798f589bc67e3"
+source = "git+https://github.com/Fedimint-Prediction-Markets/fedimint-prediction-markets#e2c12ad6adb1710ff616062aee6d6b27a3735139"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -1048,7 +1048,7 @@ dependencies = [
 [[package]]
 name = "fedimint-prediction-markets-common"
 version = "0.2.1"
-source = "git+https://github.com/Fedimint-Prediction-Markets/fedimint-prediction-markets#df7f3306d79bf73769992f7c177798f589bc67e3"
+source = "git+https://github.com/Fedimint-Prediction-Markets/fedimint-prediction-markets#e2c12ad6adb1710ff616062aee6d6b27a3735139"
 dependencies = [
  "anyhow",
  "async-trait",

@@ -1,14 +1,18 @@
+use std::collections::BTreeMap;
 use std::time::Duration;
 
 use fedimint_core::OutPoint;
+use fedimint_prediction_markets_common::config::GeneralConsensus;
 use fedimint_prediction_markets_common::{
-    ContractOfOutcomeAmount, Outcome, Seconds, UnixTimestamp,
+    Candlestick, ContractOfOutcomeAmount, Outcome, Seconds, UnixTimestamp,
 };
 use leptos::*;
 use tracing::info;
 
 use crate::context::ClientContext;
 use crate::prediction_markets::js;
+
+const DELAY_BETWEEN_CANDLESTICK_REQUESTS: Duration = Duration::from_millis(500);
 
 #[component]
 pub fn CandlestickChart(
@@ -19,65 +23,76 @@ pub fn CandlestickChart(
 ) -> impl IntoView {
     let ClientContext { client, .. } = expect_context::<ClientContext>(cx);
 
-    let candlesticks_recieved = create_rw_signal(cx, Vec::new());
+    let chart_msg_stream: RwSignal<Option<ChartMsg>> = create_rw_signal(cx, None);
+    let params_incrementer = create_rw_signal(cx, 0u32);
 
-    let newest_candlestick_timestamp = create_rw_signal(cx, UnixTimestamp::ZERO);
-    let newest_candlestick_volume = create_rw_signal(cx, ContractOfOutcomeAmount::ZERO);
+    create_effect(cx, move |prev| {
+        let this_market_outpoint = market_outpoint.get();
+        let this_outcome = outcome.get();
+        let this_candlestick_interval = candlestick_interval.get();
 
-    let candlestick_resource = create_resource(
-        cx,
-        move || (),
-        move |()| async move {
-            info!(
-                "{:?} {:?}",
-                newest_candlestick_timestamp.get_untracked(),
-                newest_candlestick_volume.get_untracked()
-            );
+        params_incrementer.set_untracked(params_incrementer.get_untracked() + 1);
+        let params_id = params_incrementer.get_untracked();
 
-            client
-                .get_value()
-                .wait_candlesticks(
-                    market_outpoint.get_untracked(),
-                    outcome.get_untracked(),
-                    candlestick_interval.get_untracked(),
-                    newest_candlestick_timestamp.get_untracked(),
-                    newest_candlestick_volume.get_untracked(),
-                )
-                .await
-        },
-    );
+        if prev.is_some() {
+            chart_msg_stream.set(Some(ChartMsg::ClearChart));
+        }
 
-    create_effect(cx, move |_| {
-        _ = market_outpoint.get();
-        _ = outcome.get();
-        _ = candlestick_interval.get();
+        let candlestick_timestamp = create_rw_signal(cx, UnixTimestamp::ZERO);
+        let candlestick_volume = create_rw_signal(cx, ContractOfOutcomeAmount::ZERO);
 
-        newest_candlestick_timestamp.set(UnixTimestamp::ZERO);
-        newest_candlestick_volume.set(ContractOfOutcomeAmount::ZERO);
+        let candlestick_resource = create_resource(
+            cx,
+            move || (),
+            move |_| async move {
+                let r = client
+                    .get_value()
+                    .wait_candlesticks(
+                        this_market_outpoint,
+                        this_outcome,
+                        this_candlestick_interval,
+                        candlestick_timestamp.get_untracked(),
+                        candlestick_volume.get_untracked(),
+                    )
+                    .await;
 
-        candlestick_resource.refetch();
-    });
-
-    create_effect(cx, move |_| match candlestick_resource.read(cx) {
-        Some(Ok(candlesticks)) => {
-            if candlesticks.len() != 0 {
-                for c in candlesticks.iter() {
-                    candlesticks_recieved.update(|cr| cr.push((c.0.to_owned(), c.1.to_owned())))
+                if let Ok(candlesticks) = &r {
+                    if let Some(last) = candlesticks.last_key_value() {
+                        candlestick_timestamp.set_untracked(last.0.to_owned());
+                        candlestick_volume.set_untracked(last.1.volume.to_owned());
+                    }
                 }
 
-                let newest_candlestick = candlesticks.last_key_value().unwrap();
-                newest_candlestick_timestamp.set(newest_candlestick.0.to_owned());
-                newest_candlestick_volume.set(newest_candlestick.1.volume.to_owned());
+                r
+            },
+        );
+
+        create_effect(cx, move |_| {
+            if candlestick_resource.loading().get() == false
+                && params_id == params_incrementer.get_untracked()
+            {
+                set_timeout(
+                    move || candlestick_resource.refetch(),
+                    DELAY_BETWEEN_CANDLESTICK_REQUESTS,
+                );
             }
+        });
 
-            set_timeout(
-                move || candlestick_resource.refetch(),
-                Duration::from_millis(600),
-            );
+        create_effect(cx, move |_| {
+            let Some(Ok(c)) = candlestick_resource.read(cx) else {
+                return;
+            };
 
-            info!("{:?}", candlesticks)
+            if params_id == params_incrementer.get_untracked() {
+                chart_msg_stream.set(Some(ChartMsg::Candelsticks(c)))
+            }
+        });
+    });
+
+    create_effect(cx, move |_| {
+        if let Some(msg) = chart_msg_stream.get() {
+            info!("Chart message recieved: {:?}", msg)
         }
-        _ => (),
     });
 
     let mut chart_div = view! { cx, <div />};
@@ -87,11 +102,12 @@ pub fn CandlestickChart(
 
     view! {
         cx,
-        {market_outpoint.get_untracked().to_string()}
-        <br />
-        {outcome}
-        <br />
-        {move || candlesticks_recieved.get().into_iter().map(|c| format!("timestamp: {:?}\n candlestick: {:?}\n\n", c.0, c.1)).collect_view(cx)}
         {chart_div}
     }
+}
+
+#[derive(Debug, Clone)]
+enum ChartMsg {
+    Candelsticks(BTreeMap<UnixTimestamp, Candlestick>),
+    ClearChart,
 }

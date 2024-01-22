@@ -1,11 +1,12 @@
-use crate::db::PersistentMemDb;
-use crate::prediction_markets::{PredictionMarketsRpcRequest, PredictionMarketsRpcResponse};
+use std::fmt::{Debug, Formatter};
+use std::str::FromStr;
+use std::time::SystemTime;
+
 use fedimint_client::secret::{PlainRootSecretStrategy, RootSecretStrategy};
 use fedimint_client::{Client, FederationInfo};
 use fedimint_core::api::InviteCode;
 use fedimint_core::core::OperationId;
-use fedimint_core::db::IDatabaseTransactionOpsCore;
-use fedimint_core::db::IRawDatabase;
+use fedimint_core::db::{IDatabaseTransactionOpsCore, IRawDatabase};
 use fedimint_core::task::spawn;
 use fedimint_core::util::BoxStream;
 use fedimint_core::Amount;
@@ -23,12 +24,14 @@ use leptos::warn;
 use lightning_invoice::{Bolt11Invoice, Bolt11InvoiceDescription};
 use rand::thread_rng;
 use serde::{Deserialize, Serialize};
-use std::fmt::{Debug, Formatter};
-use std::str::FromStr;
-use std::time::SystemTime;
 use thiserror::Error as ThisError;
 use tokio::sync::{mpsc, oneshot, watch};
 use tracing::{debug, info};
+
+use crate::db::PersistentMemDb;
+use crate::prediction_markets::client::{
+    PredictionMarketsRpcRequest, PredictionMarketsRpcResponse,
+};
 
 #[derive(Debug, Clone)]
 pub enum RpcRequest {
@@ -248,178 +251,184 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
 
     while let Some((rpc_request, response_sender)) = rpc.recv().await {
         debug!("Received RPC request: {:?}", rpc_request);
-        match rpc_request {
-            RpcRequest::GetName => {
-                let name = client
-                    .get_meta("federation_name")
-                    .unwrap_or("<unknown>".to_string());
-                let _ = response_sender
-                    .send(Ok(RpcResponse::GetName(name)))
-                    .map_err(|_| warn!("RPC receiver dropped before response was sent"));
-            }
-            RpcRequest::SubscribeBalance => {
-                let stream = client.subscribe_balance_changes().await;
-                let _ = response_sender
-                    .send(Ok(RpcResponse::SubscribeBalance(stream)))
-                    .map_err(|_| warn!("RPC receiver dropped before response was sent"));
-            }
-            RpcRequest::Receive(notes) => {
-                async fn receive_inner(
-                    client: &Client,
-                    notes: &str,
-                ) -> anyhow::Result<RpcResponse> {
-                    let notes = notes.trim();
-                    info!("Receiving notes: \"{notes}\"");
-                    let notes: OOBNotes = notes.parse()?;
-                    let amount = notes.total_amount();
-                    client
-                        .get_first_module::<MintClientModule>()
-                        .reissue_external_notes(notes, ())
-                        .await?;
-                    Ok(RpcResponse::Receive(amount))
+        
+        wasm_bindgen_futures::spawn_local(async move {
+            match rpc_request {
+                RpcRequest::GetName => {
+                    let name = client
+                        .get_meta("federation_name")
+                        .unwrap_or("<unknown>".to_string());
+                    let _ = response_sender
+                        .send(Ok(RpcResponse::GetName(name)))
+                        .map_err(|_| warn!("RPC receiver dropped before response was sent"));
                 }
-                let _ = response_sender
-                    .send(receive_inner(client, &notes).await)
-                    .map_err(|_| warn!("RPC receiver dropped before response was sent"));
-            }
-            RpcRequest::LnSend(invoice) => {
-                let invoice = match Bolt11Invoice::from_str(&invoice) {
-                    Ok(invoice) => invoice,
-                    Err(e) => {
-                        let _ = response_sender
-                            .send(Err(anyhow::anyhow!("Invalid invoice: {e:?}")))
-                            .map_err(|_| warn!("RPC receiver dropped before response was sent"));
-                        continue;
-                    }
-                };
-
-                let _ = response_sender
-                    .send(
+                RpcRequest::SubscribeBalance => {
+                    let stream = client.subscribe_balance_changes().await;
+                    let _ = response_sender
+                        .send(Ok(RpcResponse::SubscribeBalance(stream)))
+                        .map_err(|_| warn!("RPC receiver dropped before response was sent"));
+                }
+                RpcRequest::Receive(notes) => {
+                    async fn receive_inner(
+                        client: &Client,
+                        notes: &str,
+                    ) -> anyhow::Result<RpcResponse> {
+                        let notes = notes.trim();
+                        info!("Receiving notes: \"{notes}\"");
+                        let notes: OOBNotes = notes.parse()?;
+                        let amount = notes.total_amount();
                         client
-                            .get_first_module::<LightningClientModule>()
-                            .pay_bolt11_invoice(invoice, ())
-                            .await
-                            .map(|_| RpcResponse::LnSend),
-                    )
-                    .map_err(|_| warn!("RPC receiver dropped before response was sent"));
-            }
-            RpcRequest::LnReceive {
-                amount,
-                description,
-            } => {
-                let (operation_id, invoice) = match client
-                    .get_first_module::<LightningClientModule>()
-                    .create_bolt11_invoice(amount, description, None, ())
-                    .await
-                {
-                    Ok(res) => res,
-                    Err(e) => {
-                        let _ = response_sender
-                            .send(Err(e))
-                            .map_err(|_| warn!("RPC receiver dropped before response was sent"));
-                        continue;
+                            .get_first_module::<MintClientModule>()
+                            .reissue_external_notes(notes, ())
+                            .await?;
+                        Ok(RpcResponse::Receive(amount))
                     }
-                };
-
-                let (await_paid_sender, await_paid_receiver) = watch::channel(false);
-                let mut subscription = client
-                    .get_first_module::<LightningClientModule>()
-                    .subscribe_ln_receive(operation_id)
-                    .await
-                    .expect("subscribing to a just created operation can't fail")
-                    .into_stream();
-                spawn("waiting for invoice being paid", async move {
-                    while let Some(state) = subscription.next().await {
-                        if state == fedimint_ln_client::LnReceiveState::Funded {
-                            let _ = await_paid_sender.send(true);
+                    let _ = response_sender
+                        .send(receive_inner(client, &notes).await)
+                        .map_err(|_| warn!("RPC receiver dropped before response was sent"));
+                }
+                RpcRequest::LnSend(invoice) => {
+                    let invoice = match Bolt11Invoice::from_str(&invoice) {
+                        Ok(invoice) => invoice,
+                        Err(e) => {
+                            let _ = response_sender
+                                .send(Err(anyhow::anyhow!("Invalid invoice: {e:?}")))
+                                .map_err(|_| {
+                                    warn!("RPC receiver dropped before response was sent")
+                                });
+                            return;
                         }
-                    }
-                });
+                    };
 
-                let _ = response_sender
-                    .send(Ok(RpcResponse::LnReceive {
-                        invoice: invoice.to_string(),
-                        await_paid: await_paid_receiver,
-                    }))
-                    .map_err(|_| warn!("RPC receiver dropped before response was sent"));
-            }
-            RpcRequest::ListTransactions => {
-                let transactions = client
-                    .operation_log()
-                    .list_operations(100, None)
-                    .await
-                    .into_iter()
-                    .map(|(key, op_log)| {
-                        let (amount_msat, description) = match op_log.operation_module_kind() {
-                            "mint" => {
-                                let meta = op_log.meta::<MintOperationMeta>();
-                                match meta.variant {
-                                    MintOperationMetaVariant::Reissuance { .. } => {
-                                        (meta.amount.msats as i64, None)
-                                    }
-                                    MintOperationMetaVariant::SpendOOB { .. } => {
-                                        (-(meta.amount.msats as i64), None)
-                                    }
-                                }
+                    let _ = response_sender
+                        .send(
+                            client
+                                .get_first_module::<LightningClientModule>()
+                                .pay_bolt11_invoice(invoice, ())
+                                .await
+                                .map(|_| RpcResponse::LnSend),
+                        )
+                        .map_err(|_| warn!("RPC receiver dropped before response was sent"));
+                }
+                RpcRequest::LnReceive {
+                    amount,
+                    description,
+                } => {
+                    let (operation_id, invoice) = match client
+                        .get_first_module::<LightningClientModule>()
+                        .create_bolt11_invoice(amount, description, None, ())
+                        .await
+                    {
+                        Ok(res) => res,
+                        Err(e) => {
+                            let _ = response_sender.send(Err(e)).map_err(|_| {
+                                warn!("RPC receiver dropped before response was sent")
+                            });
+                            return;
+                        }
+                    };
+
+                    let (await_paid_sender, await_paid_receiver) = watch::channel(false);
+                    let mut subscription = client
+                        .get_first_module::<LightningClientModule>()
+                        .subscribe_ln_receive(operation_id)
+                        .await
+                        .expect("subscribing to a just created operation can't fail")
+                        .into_stream();
+                    spawn("waiting for invoice being paid", async move {
+                        while let Some(state) = subscription.next().await {
+                            if state == fedimint_ln_client::LnReceiveState::Funded {
+                                let _ = await_paid_sender.send(true);
                             }
-                            "ln" => match op_log.meta::<LightningOperationMeta>().variant {
-                                LightningOperationMetaVariant::Receive { invoice, .. } => {
-                                    let amount = invoice
-                                        .amount_milli_satoshis()
-                                        .expect("We don't create 0 amount invoices")
-                                        as i64;
-                                    let description = match invoice.description() {
-                                        Bolt11InvoiceDescription::Direct(description) => {
-                                            Some(description.to_string())
-                                        }
-                                        Bolt11InvoiceDescription::Hash(_) => None,
-                                    };
-
-                                    (amount, description)
-                                }
-                                LightningOperationMetaVariant::Pay(LightningOperationMetaPay {
-                                    invoice,
-                                    ..
-                                }) => {
-                                    // TODO: add fee
-                                    let amount = -(invoice
-                                        .amount_milli_satoshis()
-                                        .expect("Can't pay 0 amount invoices")
-                                        as i64);
-                                    let description = match invoice.description() {
-                                        Bolt11InvoiceDescription::Direct(description) => {
-                                            Some(description.to_string())
-                                        }
-                                        Bolt11InvoiceDescription::Hash(_) => None,
-                                    };
-
-                                    (amount, description)
-                                }
-                            },
-                            _ => panic!("Unsupported module"),
-                        };
-
-                        Transaction {
-                            timestamp: key.creation_time,
-                            operation_id: key.operation_id,
-                            operation_kind: op_log.operation_module_kind().to_owned(),
-                            amount_msat,
-                            description,
                         }
-                    })
-                    .collect::<Vec<_>>();
-                let _ = response_sender
-                    .send(Ok(RpcResponse::ListTransactions(transactions)))
-                    .map_err(|_| warn!("RPC receiver dropped before response was sent"));
-            }
-            RpcRequest::PredictionMarkets(request) => request.handle(client, response_sender).await,
+                    });
 
-            req => {
-                let _ = response_sender
-                    .send(Err(anyhow::anyhow!("Invalid request: {req:?}")))
-                    .map_err(|_| warn!("RPC receiver dropped before response was sent"));
+                    let _ = response_sender
+                        .send(Ok(RpcResponse::LnReceive {
+                            invoice: invoice.to_string(),
+                            await_paid: await_paid_receiver,
+                        }))
+                        .map_err(|_| warn!("RPC receiver dropped before response was sent"));
+                }
+                RpcRequest::ListTransactions => {
+                    let transactions = client
+                        .operation_log()
+                        .list_operations(100, None)
+                        .await
+                        .into_iter()
+                        .map(|(key, op_log)| {
+                            let (amount_msat, description) = match op_log.operation_module_kind() {
+                                "mint" => {
+                                    let meta = op_log.meta::<MintOperationMeta>();
+                                    match meta.variant {
+                                        MintOperationMetaVariant::Reissuance { .. } => {
+                                            (meta.amount.msats as i64, None)
+                                        }
+                                        MintOperationMetaVariant::SpendOOB { .. } => {
+                                            (-(meta.amount.msats as i64), None)
+                                        }
+                                    }
+                                }
+                                "ln" => match op_log.meta::<LightningOperationMeta>().variant {
+                                    LightningOperationMetaVariant::Receive { invoice, .. } => {
+                                        let amount = invoice
+                                            .amount_milli_satoshis()
+                                            .expect("We don't create 0 amount invoices")
+                                            as i64;
+                                        let description = match invoice.description() {
+                                            Bolt11InvoiceDescription::Direct(description) => {
+                                                Some(description.to_string())
+                                            }
+                                            Bolt11InvoiceDescription::Hash(_) => None,
+                                        };
+
+                                        (amount, description)
+                                    }
+                                    LightningOperationMetaVariant::Pay(
+                                        LightningOperationMetaPay { invoice, .. },
+                                    ) => {
+                                        // TODO: add fee
+                                        let amount = -(invoice
+                                            .amount_milli_satoshis()
+                                            .expect("Can't pay 0 amount invoices")
+                                            as i64);
+                                        let description = match invoice.description() {
+                                            Bolt11InvoiceDescription::Direct(description) => {
+                                                Some(description.to_string())
+                                            }
+                                            Bolt11InvoiceDescription::Hash(_) => None,
+                                        };
+
+                                        (amount, description)
+                                    }
+                                },
+                                _ => panic!("Unsupported module"),
+                            };
+
+                            Transaction {
+                                timestamp: key.creation_time,
+                                operation_id: key.operation_id,
+                                operation_kind: op_log.operation_module_kind().to_owned(),
+                                amount_msat,
+                                description,
+                            }
+                        })
+                        .collect::<Vec<_>>();
+                    let _ = response_sender
+                        .send(Ok(RpcResponse::ListTransactions(transactions)))
+                        .map_err(|_| warn!("RPC receiver dropped before response was sent"));
+                }
+                RpcRequest::PredictionMarkets(request) => {
+                    request.handle(client, response_sender).await;
+                }
+
+                req => {
+                    let _ = response_sender
+                        .send(Err(anyhow::anyhow!("Invalid request: {req:?}")))
+                        .map_err(|_| warn!("RPC receiver dropped before response was sent"));
+                }
             }
-        }
+        })
     }
 
     info!("Client RPC handler shutting down");
@@ -554,7 +563,8 @@ impl ClientRpc {
         }
     }
 
-    /// Opens a wallet and returns whether it is initialized already. If false is returned an invite code has to be provided.
+    /// Opens a wallet and returns whether it is initialized already. If false
+    /// is returned an invite code has to be provided.
     pub async fn select_wallet(&self, name: String) -> Result<bool, RpcError> {
         let (response_sender, response_receiver) = oneshot::channel();
         self.sender
