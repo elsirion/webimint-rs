@@ -2,7 +2,6 @@ use std::collections::BTreeMap;
 use std::time::Duration;
 
 use fedimint_core::OutPoint;
-use fedimint_prediction_markets_common::config::GeneralConsensus;
 use fedimint_prediction_markets_common::{
     Candlestick, ContractOfOutcomeAmount, Outcome, Seconds, UnixTimestamp,
 };
@@ -10,7 +9,6 @@ use leptos::*;
 use tracing::info;
 
 use crate::context::ClientContext;
-use crate::prediction_markets::js;
 
 const DELAY_BETWEEN_CANDLESTICK_REQUESTS: Duration = Duration::from_millis(500);
 

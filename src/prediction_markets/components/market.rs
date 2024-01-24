@@ -24,7 +24,7 @@ pub fn Market(cx: Scope, market_outpoint: Memo<OutPoint>) -> impl IntoView {
         Some(Err(_)) => Err(anyhow!("issue getting market")),
         None => Err(anyhow!("action has not run")),
     };
-    let market = move || get_market_result().ok();
+    let market = create_memo(cx, move |_| get_market_result().ok());
 
     let outcome = create_rw_signal(cx, Outcome::from(0));
 
@@ -39,17 +39,19 @@ pub fn Market(cx: Scope, market_outpoint: Memo<OutPoint>) -> impl IntoView {
 
     view! { cx,
         <Show
-            when=move || matches!{market(), Some(_)}
+            when=move || matches!{market.get(), Some(_)}
             fallback=|_| empty_view()
         >
-            <h1 class="text-2xl">{market().map(|m| m.information.title)}</h1>
+            <h1 class="text-2xl">{move || market.get().map(|m| m.information.title)}</h1>
+
+            <p>{move || market.get().map(|m| m.information.description)}</p>
 
             <table class="p-2 bor">
                 <thead>
                     <th>"Payout Control Public Key"</th>
                     <th>"Weight"</th>
                 </thead>
-                {move || market().map(|m| {
+                {move || market.get().map(|m| {
                     m.payout_controls_weights
                         .into_iter()
                         .map(move |(k, v)| view! {
@@ -63,8 +65,10 @@ pub fn Market(cx: Scope, market_outpoint: Memo<OutPoint>) -> impl IntoView {
                 })}
             </table>
 
+            <p>"Expected payout time: "{move || market.get().map(|m| format!("{:?}",m.information.expected_payout_timestamp))}</p>
+
             <div class="flex">
-                {move || market().map(|m| {
+                {move || market.get().map(|m| {
                     m.information.outcome_titles.into_iter().enumerate().map(|(i, outcome_title)| {
                         view! {
                             cx,

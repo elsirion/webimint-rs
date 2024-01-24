@@ -1,9 +1,6 @@
 use leptos::*;
 
 use crate::context::ClientContext;
-use crate::prediction_markets::client::{
-    PredictionMarketsRpcRequest, PredictionMarketsRpcResponse,
-};
 use crate::prediction_markets::js;
 
 #[component]

@@ -48,7 +48,7 @@ pub fn Joined(cx: Scope) -> impl IntoView {
       <h1 class="font-heading text-gray-900 text-4xl font-semibold">{federation_label}</h1>
       <Balance class="my-12" />
       <ul
-        class="my-12 w-full flex flex-row"
+        class="my-4 w-full flex flex-row"
         >
         <li class="w-1/4">
         <button

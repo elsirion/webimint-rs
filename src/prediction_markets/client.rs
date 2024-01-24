@@ -91,14 +91,14 @@ pub enum PredictionMarketsRpcRequest {
         market: OutPoint,
     },
     GetSavedMarkets,
-    SetPayoutControlName {
-        payout_control: PublicKey,
-        name: Option<String>,
+    SetNameToPayoutControl {
+        name: String,
+        payout_control: Option<PublicKey>,
     },
-    GetPayoutControlName {
-        payout_control: PublicKey,
+    GetNameToPayoutControl {
+        name: String,
     },
-    GetPayoutControlNameMap,
+    GetNameToPayoutControlMap,
 }
 
 #[derive(Debug)]
@@ -123,9 +123,9 @@ pub enum PredictionMarketsRpcResponse {
     SaveMarket,
     UnsaveMarket,
     GetSavedMarkets(BTreeMap<UnixTimestamp, OutPoint>),
-    SetPayoutControlName,
-    GetPayoutControlName(Option<String>),
-    GetPayoutControlNameMap(HashMap<PublicKey, String>),
+    SetNameToPayoutControl,
+    GetNameToPayoutControl(Option<PublicKey>),
+    GetNameToPayoutControlMap(HashMap<String, PublicKey>),
 }
 
 impl PredictionMarketsRpcRequest {
@@ -410,37 +410,37 @@ impl PredictionMarketsRpcRequest {
                     )))
                     .map_err(|_| warn!("RPC receiver dropped before response was sent"));
             }
-            Self::SetPayoutControlName {
-                payout_control,
+            Self::SetNameToPayoutControl {
                 name,
+                payout_control,
             } => {
                 prediction_markets_client
-                    .set_payout_control_name(payout_control, name)
+                    .set_name_to_payout_control(name, payout_control)
                     .await;
 
                 _ = response_sender
                     .send(Ok(RpcResponse::PredictionMarkets(
-                        PredictionMarketsRpcResponse::SetPayoutControlName,
+                        PredictionMarketsRpcResponse::SetNameToPayoutControl,
                     )))
                     .map_err(|_| warn!("RPC receiver dropped before response was sent"));
             }
-            Self::GetPayoutControlName { payout_control } => {
+            Self::GetNameToPayoutControl { name } => {
                 _ = response_sender
                     .send(Ok(RpcResponse::PredictionMarkets(
-                        PredictionMarketsRpcResponse::GetPayoutControlName(
+                        PredictionMarketsRpcResponse::GetNameToPayoutControl(
                             prediction_markets_client
-                                .get_payout_control_name(payout_control)
+                                .get_name_to_payout_control(name)
                                 .await,
                         ),
                     )))
                     .map_err(|_| warn!("RPC receiver dropped before response was sent"));
             }
-            Self::GetPayoutControlNameMap => {
+            Self::GetNameToPayoutControlMap => {
                 _ = response_sender
                     .send(Ok(RpcResponse::PredictionMarkets(
-                        PredictionMarketsRpcResponse::GetPayoutControlNameMap(
+                        PredictionMarketsRpcResponse::GetNameToPayoutControlMap(
                             prediction_markets_client
-                                .get_payout_control_name_map()
+                                .get_name_to_payout_control_map()
                                 .await,
                         ),
                     )))
@@ -728,10 +728,7 @@ impl ClientRpc {
         }
     }
 
-    pub async fn cancel_order(
-        &self,
-        id: OrderIdClientSide,
-    ) -> anyhow::Result<(), RpcError> {
+    pub async fn cancel_order(&self, id: OrderIdClientSide) -> anyhow::Result<(), RpcError> {
         let (response_sender, response_receiver) = oneshot::channel();
         self.sender
             .send((
@@ -742,12 +739,12 @@ impl ClientRpc {
             .expect("Client has stopped");
         let response = response_receiver.await.expect("Client has stopped");
         match response {
-            Ok(RpcResponse::PredictionMarkets(PredictionMarketsRpcResponse::CancelOrder(Ok(r)))) => {
-                Ok(r)
-            }
-            Ok(RpcResponse::PredictionMarkets(PredictionMarketsRpcResponse::CancelOrder(Err(e)))) => {
-                Err(RpcError::ClientStopped(e.to_string()))
-            }
+            Ok(RpcResponse::PredictionMarkets(PredictionMarketsRpcResponse::CancelOrder(Ok(
+                r,
+            )))) => Ok(r),
+            Ok(RpcResponse::PredictionMarkets(PredictionMarketsRpcResponse::CancelOrder(Err(
+                e,
+            )))) => Err(RpcError::ClientStopped(e.to_string())),
             _ => Err(RpcError::InvalidResponse),
         }
     }
@@ -758,19 +755,21 @@ impl ClientRpc {
         let (response_sender, response_receiver) = oneshot::channel();
         self.sender
             .send((
-                RpcRequest::PredictionMarkets(PredictionMarketsRpcRequest::SendOrderBitcoinBalanceToPrimaryModule),
+                RpcRequest::PredictionMarkets(
+                    PredictionMarketsRpcRequest::SendOrderBitcoinBalanceToPrimaryModule,
+                ),
                 response_sender,
             ))
             .await
             .expect("Client has stopped");
         let response = response_receiver.await.expect("Client has stopped");
         match response {
-            Ok(RpcResponse::PredictionMarkets(PredictionMarketsRpcResponse::SendOrderBitcoinBalanceToPrimaryModule(Ok(r)))) => {
-                Ok(r)
-            }
-            Ok(RpcResponse::PredictionMarkets(PredictionMarketsRpcResponse::SendOrderBitcoinBalanceToPrimaryModule(Err(e)))) => {
-                Err(RpcError::ClientStopped(e.to_string()))
-            }
+            Ok(RpcResponse::PredictionMarkets(
+                PredictionMarketsRpcResponse::SendOrderBitcoinBalanceToPrimaryModule(Ok(r)),
+            )) => Ok(r),
+            Ok(RpcResponse::PredictionMarkets(
+                PredictionMarketsRpcResponse::SendOrderBitcoinBalanceToPrimaryModule(Err(e)),
+            )) => Err(RpcError::ClientStopped(e.to_string())),
             _ => Err(RpcError::InvalidResponse),
         }
     }
@@ -784,7 +783,11 @@ impl ClientRpc {
         let (response_sender, response_receiver) = oneshot::channel();
         self.sender
             .send((
-                RpcRequest::PredictionMarkets(PredictionMarketsRpcRequest::SyncOrders { sync_possible_payouts, market, outcome }),
+                RpcRequest::PredictionMarkets(PredictionMarketsRpcRequest::SyncOrders {
+                    sync_possible_payouts,
+                    market,
+                    outcome,
+                }),
                 response_sender,
             ))
             .await
@@ -794,9 +797,9 @@ impl ClientRpc {
             Ok(RpcResponse::PredictionMarkets(PredictionMarketsRpcResponse::SyncOrders(Ok(r)))) => {
                 Ok(r)
             }
-            Ok(RpcResponse::PredictionMarkets(PredictionMarketsRpcResponse::SyncOrders(Err(e)))) => {
-                Err(RpcError::ClientStopped(e.to_string()))
-            }
+            Ok(RpcResponse::PredictionMarkets(PredictionMarketsRpcResponse::SyncOrders(Err(
+                e,
+            )))) => Err(RpcError::ClientStopped(e.to_string())),
             _ => Err(RpcError::InvalidResponse),
         }
     }
@@ -809,40 +812,42 @@ impl ClientRpc {
         let (response_sender, response_receiver) = oneshot::channel();
         self.sender
             .send((
-                RpcRequest::PredictionMarkets(PredictionMarketsRpcRequest::GetOrdersFromDb { market, outcome }),
+                RpcRequest::PredictionMarkets(PredictionMarketsRpcRequest::GetOrdersFromDb {
+                    market,
+                    outcome,
+                }),
                 response_sender,
             ))
             .await
             .expect("Client has stopped");
         let response = response_receiver.await.expect("Client has stopped");
         match response {
-            Ok(RpcResponse::PredictionMarkets(PredictionMarketsRpcResponse::GetOrdersFromDb(r))) => {
-                Ok(r)
-            }
+            Ok(RpcResponse::PredictionMarkets(PredictionMarketsRpcResponse::GetOrdersFromDb(
+                r,
+            ))) => Ok(r),
             _ => Err(RpcError::InvalidResponse),
         }
     }
 
-    pub async fn resync_order_slots(
-        &self,
-        gap_size_to_check: u16
-    ) -> anyhow::Result<(), RpcError> {
+    pub async fn resync_order_slots(&self, gap_size_to_check: u16) -> anyhow::Result<(), RpcError> {
         let (response_sender, response_receiver) = oneshot::channel();
         self.sender
             .send((
-                RpcRequest::PredictionMarkets(PredictionMarketsRpcRequest::ResyncOrderSlots { gap_size_to_check }),
+                RpcRequest::PredictionMarkets(PredictionMarketsRpcRequest::ResyncOrderSlots {
+                    gap_size_to_check,
+                }),
                 response_sender,
             ))
             .await
             .expect("Client has stopped");
         let response = response_receiver.await.expect("Client has stopped");
         match response {
-            Ok(RpcResponse::PredictionMarkets(PredictionMarketsRpcResponse::ResyncOrderSlots(Ok(r)))) => {
-                Ok(r)
-            }
-            Ok(RpcResponse::PredictionMarkets(PredictionMarketsRpcResponse::ResyncOrderSlots(Err(e)))) => {
-                Err(RpcError::ClientStopped(e.to_string()))
-            }
+            Ok(RpcResponse::PredictionMarkets(PredictionMarketsRpcResponse::ResyncOrderSlots(
+                Ok(r),
+            ))) => Ok(r),
+            Ok(RpcResponse::PredictionMarkets(PredictionMarketsRpcResponse::ResyncOrderSlots(
+                Err(e),
+            ))) => Err(RpcError::ClientStopped(e.to_string())),
             _ => Err(RpcError::InvalidResponse),
         }
     }
@@ -857,19 +862,24 @@ impl ClientRpc {
         let (response_sender, response_receiver) = oneshot::channel();
         self.sender
             .send((
-                RpcRequest::PredictionMarkets(PredictionMarketsRpcRequest::GetCandlesticks { market, outcome, candlestick_interval, min_candlestick_timestamp }),
+                RpcRequest::PredictionMarkets(PredictionMarketsRpcRequest::GetCandlesticks {
+                    market,
+                    outcome,
+                    candlestick_interval,
+                    min_candlestick_timestamp,
+                }),
                 response_sender,
             ))
             .await
             .expect("Client has stopped");
         let response = response_receiver.await.expect("Client has stopped");
         match response {
-            Ok(RpcResponse::PredictionMarkets(PredictionMarketsRpcResponse::GetCandlesticks(Ok(r)))) => {
-                Ok(r)
-            }
-            Ok(RpcResponse::PredictionMarkets(PredictionMarketsRpcResponse::GetCandlesticks(Err(e)))) => {
-                Err(RpcError::ClientStopped(e.to_string()))
-            }
+            Ok(RpcResponse::PredictionMarkets(PredictionMarketsRpcResponse::GetCandlesticks(
+                Ok(r),
+            ))) => Ok(r),
+            Ok(RpcResponse::PredictionMarkets(PredictionMarketsRpcResponse::GetCandlesticks(
+                Err(e),
+            ))) => Err(RpcError::ClientStopped(e.to_string())),
             _ => Err(RpcError::InvalidResponse),
         }
     }
@@ -885,27 +895,30 @@ impl ClientRpc {
         let (response_sender, response_receiver) = oneshot::channel();
         self.sender
             .send((
-                RpcRequest::PredictionMarkets(PredictionMarketsRpcRequest::WaitCandlesticks { market, outcome, candlestick_interval, candlestick_timestamp, candlestick_volume }    ),
+                RpcRequest::PredictionMarkets(PredictionMarketsRpcRequest::WaitCandlesticks {
+                    market,
+                    outcome,
+                    candlestick_interval,
+                    candlestick_timestamp,
+                    candlestick_volume,
+                }),
                 response_sender,
             ))
             .await
             .expect("Client has stopped");
         let response = response_receiver.await.expect("Client has stopped");
         match response {
-            Ok(RpcResponse::PredictionMarkets(PredictionMarketsRpcResponse::WaitCandlesticks(Ok(r)))) => {
-                Ok(r)
-            }
-            Ok(RpcResponse::PredictionMarkets(PredictionMarketsRpcResponse::WaitCandlesticks(Err(e)))) => {
-                Err(RpcError::ClientStopped(e.to_string()))
-            }
+            Ok(RpcResponse::PredictionMarkets(PredictionMarketsRpcResponse::WaitCandlesticks(
+                Ok(r),
+            ))) => Ok(r),
+            Ok(RpcResponse::PredictionMarkets(PredictionMarketsRpcResponse::WaitCandlesticks(
+                Err(e),
+            ))) => Err(RpcError::ClientStopped(e.to_string())),
             _ => Err(RpcError::InvalidResponse),
         }
     }
 
-    pub async fn save_market(
-        &self,
-        market: OutPoint,
-    ) -> anyhow::Result<(), RpcError> {
+    pub async fn save_market(&self, market: OutPoint) -> anyhow::Result<(), RpcError> {
         let (response_sender, response_receiver) = oneshot::channel();
         self.sender
             .send((
@@ -916,17 +929,12 @@ impl ClientRpc {
             .expect("Client has stopped");
         let response = response_receiver.await.expect("Client has stopped");
         match response {
-            Ok(RpcResponse::PredictionMarkets(PredictionMarketsRpcResponse::SaveMarket)) => {
-                Ok(())
-            }
+            Ok(RpcResponse::PredictionMarkets(PredictionMarketsRpcResponse::SaveMarket)) => Ok(()),
             _ => Err(RpcError::InvalidResponse),
         }
     }
 
-    pub async fn unsave_market(
-        &self,
-        market: OutPoint,
-    ) -> anyhow::Result<(), RpcError> {
+    pub async fn unsave_market(&self, market: OutPoint) -> anyhow::Result<(), RpcError> {
         let (response_sender, response_receiver) = oneshot::channel();
         self.sender
             .send((
@@ -957,71 +965,79 @@ impl ClientRpc {
             .expect("Client has stopped");
         let response = response_receiver.await.expect("Client has stopped");
         match response {
-            Ok(RpcResponse::PredictionMarkets(PredictionMarketsRpcResponse::GetSavedMarkets(r))) => {
-                Ok(r)
-            }
+            Ok(RpcResponse::PredictionMarkets(PredictionMarketsRpcResponse::GetSavedMarkets(
+                r,
+            ))) => Ok(r),
             _ => Err(RpcError::InvalidResponse),
         }
     }
 
-    pub async fn set_payout_control_name(
+    pub async fn set_name_to_payout_control(
         &self,
-        payout_control: PublicKey, name: Option<String>
+        name: String,
+        payout_control: Option<PublicKey>,
     ) -> anyhow::Result<(), RpcError> {
         let (response_sender, response_receiver) = oneshot::channel();
         self.sender
             .send((
-                RpcRequest::PredictionMarkets(PredictionMarketsRpcRequest::SetPayoutControlName { payout_control, name }),
+                RpcRequest::PredictionMarkets(
+                    PredictionMarketsRpcRequest::SetNameToPayoutControl {
+                        name,
+                        payout_control,
+                    },
+                ),
                 response_sender,
             ))
             .await
             .expect("Client has stopped");
         let response = response_receiver.await.expect("Client has stopped");
         match response {
-            Ok(RpcResponse::PredictionMarkets(PredictionMarketsRpcResponse::SetPayoutControlName)) => {
-                Ok(())
-            }
+            Ok(RpcResponse::PredictionMarkets(
+                PredictionMarketsRpcResponse::SetNameToPayoutControl,
+            )) => Ok(()),
             _ => Err(RpcError::InvalidResponse),
         }
     }
 
-    pub async fn get_payout_control_name(
+    pub async fn get_name_to_payout_control(
         &self,
-        payout_control: PublicKey
-    ) -> anyhow::Result<Option<String>, RpcError> {
+        name: String,
+    ) -> anyhow::Result<Option<PublicKey>, RpcError> {
         let (response_sender, response_receiver) = oneshot::channel();
         self.sender
             .send((
-                RpcRequest::PredictionMarkets(PredictionMarketsRpcRequest::GetPayoutControlName { payout_control }),
+                RpcRequest::PredictionMarkets(
+                    PredictionMarketsRpcRequest::GetNameToPayoutControl { name },
+                ),
                 response_sender,
             ))
             .await
             .expect("Client has stopped");
         let response = response_receiver.await.expect("Client has stopped");
         match response {
-            Ok(RpcResponse::PredictionMarkets(PredictionMarketsRpcResponse::GetPayoutControlName(r))) => {
-                Ok(r)
-            }
+            Ok(RpcResponse::PredictionMarkets(
+                PredictionMarketsRpcResponse::GetNameToPayoutControl(r),
+            )) => Ok(r),
             _ => Err(RpcError::InvalidResponse),
         }
     }
 
-    pub async fn get_payout_control_name_map(
+    pub async fn get_name_to_payout_control_map(
         &self,
-    ) -> anyhow::Result<HashMap<PublicKey, String>, RpcError> {
+    ) -> anyhow::Result<HashMap<String, PublicKey>, RpcError> {
         let (response_sender, response_receiver) = oneshot::channel();
         self.sender
             .send((
-                RpcRequest::PredictionMarkets(PredictionMarketsRpcRequest::GetPayoutControlNameMap),
+                RpcRequest::PredictionMarkets(PredictionMarketsRpcRequest::GetNameToPayoutControlMap),
                 response_sender,
             ))
             .await
             .expect("Client has stopped");
         let response = response_receiver.await.expect("Client has stopped");
         match response {
-            Ok(RpcResponse::PredictionMarkets(PredictionMarketsRpcResponse::GetPayoutControlNameMap(r))) => {
-                Ok(r)
-            }
+            Ok(RpcResponse::PredictionMarkets(
+                PredictionMarketsRpcResponse::GetNameToPayoutControlMap(r),
+            )) => Ok(r),
             _ => Err(RpcError::InvalidResponse),
         }
     }

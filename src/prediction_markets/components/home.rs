@@ -1,13 +1,8 @@
-use std::str::FromStr;
 
-use fedimint_core::{BitcoinHash, OutPoint, TransactionId};
 use leptos::*;
 
 use crate::context::ClientContext;
-use crate::prediction_markets::client::{
-    PredictionMarketsRpcRequest, PredictionMarketsRpcResponse,
-};
-use crate::prediction_markets::components::{ClientPayoutControl, Market};
+use crate::prediction_markets::components::{ClientPayoutControl, NewMarket, ViewMarket};
 use crate::utils::empty_view;
 
 #[component]
@@ -18,48 +13,83 @@ pub fn PredictionMarketsHome(cx: Scope) -> impl IntoView {
         cx,
         || (),
         move |_| async move {
-            match client
-                .get_value()
-                .get_general_consensus()
-                .await
-            {
+            match client.get_value().get_general_consensus().await {
                 Ok(gc) => {
                     provide_context(cx, gc.to_owned());
                     Some(gc)
                 }
-                _ => None,
+                Err(e) => {
+                    error!("failure to get general consensus: {e}");
+                    None
+                }
             }
         },
     );
 
-    let market_txid_input = create_rw_signal(cx, String::new());
-    let market_outpoint_from_input = move || {
-        Some(OutPoint {
-            txid: TransactionId::from_str(&market_txid_input.get()).ok()?,
-            out_idx: 0,
-        })
-    };
-
-    let market_outpoint = create_memo(cx, move |_| {
-        market_outpoint_from_input().unwrap_or(OutPoint {
-            txid: TransactionId::all_zeros(),
-            out_idx: 0,
-        })
-    });
+    let tab = create_rw_signal(cx, Tab::ClientPayoutControl);
 
     view! { cx,
         <Show
             when=move || matches!{general_consensus_resource.read(cx), Some(Some(_))}
             fallback=|_| empty_view()
         >
-            <ClientPayoutControl />
-            <div class="h-2"/>
-            <p>enter market txid</p>
-            <input on:input=move |ev| market_txid_input.set(event_target_value(&ev)) />
+            <div class="flex">
+                <button
+                    on:click=move |_| tab.set(Tab::ClientPayoutControl)
+                    class={move || format!("my-1 border-b-2 p-3
+                    font-body font-semibold 
+                    leading-tight hover:text-blue-500 {active}", 
+                    active = if tab.get() == Tab::ClientPayoutControl  {"text-blue-400 border-blue-400"} else {"text-gray-400 border-gray-200 hover:border-gray-700"} )}
+                >
+                    "Client Payout Control"
+                </button>
+                <button
+                    on:click=move |_| tab.set(Tab::NewMarket)
+                    class={move || format!("my-1 border-b-2 p-3
+                    font-body font-semibold  
+                    leading-tight hover:text-blue-500 {active}", 
+                    active = if tab.get() == Tab::NewMarket  {"text-blue-400 border-blue-400"} else {"text-gray-400 border-gray-200 hover:border-gray-700"} )}
+                >
+                    "New Market"
+                </button>
+                <button
+                    on:click=move |_| tab.set(Tab::ViewMarket)
+                    class={move || format!("my-1 border-b-2 p-3
+                    font-body font-semibold  
+                    leading-tight hover:text-blue-500 {active}", 
+                    active = if tab.get() == Tab::ViewMarket  {"text-blue-400 border-blue-400"} else {"text-gray-400 border-gray-200 hover:border-gray-700"} )}
+                >
+                    "View Market"
+                </button>
+            </div>
 
-            <Show when=move || market_outpoint_from_input().is_some() fallback=|_| empty_view()>
-                <Market market_outpoint=market_outpoint />
-            </Show>
+            <div>
+                <Show
+                    when=move || matches!{tab.get(), Tab::ClientPayoutControl}
+                    fallback=|_| empty_view()
+                >
+                    <ClientPayoutControl />
+                </Show>
+                <Show
+                    when=move || matches!{tab.get(), Tab::NewMarket}
+                    fallback=|_| empty_view()
+                >
+                    <NewMarket />
+                </Show>
+                <Show
+                    when=move || matches!{tab.get(), Tab::ViewMarket}
+                    fallback=|_| empty_view()
+                >
+                    <ViewMarket />
+                </Show>
+            </div>
         </Show>
     }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+enum Tab {
+    ClientPayoutControl,
+    NewMarket,
+    ViewMarket,
 }
