@@ -1,45 +1,97 @@
-// import { createChart } from '../../../node_modules/lightweight-charts';
+import { createChart } from '/lightweight-charts/dist/lightweight-charts.standalone.production.mjs';
 
 export function copy_text_to_clipboard(text) {
     navigator.clipboard.writeText(text)
 }
 
 export function create_chart() {
-    const chartOptions = { layout: { textColor: 'black', background: { type: 'solid', color: 'white' } } };
-    const chart = createChart(document.getElementById('chart'), chartOptions);
-    const areaSeries = chart.addAreaSeries({
-        lineColor: '#2962FF', topColor: '#2962FF',
-        bottomColor: 'rgba(41, 98, 255, 0.28)',
-    });
-    areaSeries.setData([
-        { time: '2018-12-22', value: 32.51 },
-        { time: '2018-12-23', value: 31.11 },
-        { time: '2018-12-24', value: 27.02 },
-        { time: '2018-12-25', value: 27.32 },
-        { time: '2018-12-26', value: 25.17 },
-        { time: '2018-12-27', value: 28.89 },
-        { time: '2018-12-28', value: 25.46 },
-        { time: '2018-12-29', value: 23.92 },
-        { time: '2018-12-30', value: 22.68 },
-        { time: '2018-12-31', value: 22.67 },
-    ]);
+    const chartOptions = {
+        layout: { textColor: '#FFF', background: { color: '#111' } },
+        grid: { vertLines: { color: 'rgba(255,255,255,.2)' }, horzLines: { color: 'rgba(255,255,255,.2)' } },
+        rightPriceScale: { borderColor: 'rgba(255,255,255,.5)' },
+        timeScale: { borderColor: 'rgba(197,200,206,.8)', timeVisible: true },
+        crosshair: { mode: 0 }
+    };
+    const chart = createChart(document.getElementById('prediction_markets_chart'), chartOptions);
 
     const candlestickSeries = chart.addCandlestickSeries({
-        upColor: '#26a69a', downColor: '#ef5350', borderVisible: false,
-        wickUpColor: '#26a69a', wickDownColor: '#ef5350',
+        priceFormat: { type: 'price', minMove: 1 }
     });
-    candlestickSeries.setData([
-        { time: '2018-12-22', open: 75.16, high: 82.84, low: 36.16, close: 45.72 },
-        { time: '2018-12-23', open: 45.12, high: 53.90, low: 45.12, close: 48.09 },
-        { time: '2018-12-24', open: 60.71, high: 60.71, low: 53.39, close: 59.29 },
-        { time: '2018-12-25', open: 68.26, high: 68.26, low: 59.04, close: 60.50 },
-        { time: '2018-12-26', open: 67.71, high: 105.85, low: 66.67, close: 91.04 },
-        { time: '2018-12-27', open: 91.04, high: 121.40, low: 82.70, close: 111.40 },
-        { time: '2018-12-28', open: 111.51, high: 142.83, low: 103.34, close: 131.25 },
-        { time: '2018-12-29', open: 131.33, high: 151.17, low: 77.68, close: 96.43 },
-        { time: '2018-12-30', open: 106.33, high: 110.20, low: 90.39, close: 98.10 },
-        { time: '2018-12-31', open: 109.87, high: 114.69, low: 85.66, close: 111.26 },
-    ]);
+    candlestickSeries.priceScale().applyOptions({
+        scaleMargins: { top: .04, bottom: .17 },
+        ticksVisible: true,
+        borderVisible: false
+    })
 
-    chart.timeScale().fitContent();
+    const volumeSeries = chart.addHistogramSeries({
+        priceFormat: { type: 'volume', precision: 0, },
+        color: 'rgba(255,255,255,.6)',
+        priceScaleId: 'volume',
+        lastValueVisible: false,
+        priceLineVisible: false
+    });
+    volumeSeries.priceScale().applyOptions({
+        scaleMargins: { top: .85, bottom: 0 }
+    })
+
+    return { chart: chart, candlestick_series: candlestickSeries, volume_series: volumeSeries }
+}
+
+export function set_chart_data(ctx, data) {
+    let candlestick_series_data = [];
+    let volume_series_data = [];
+
+    let prev_time = undefined;
+    let prev_close = undefined;
+    for (let kv of data.Data.candlesticks.entries()) {
+        if (prev_time != undefined) {
+            let next_timestamp = prev_time + data.Data.interval;
+            while (kv[0] != next_timestamp) {
+                candlestick_series_data.push(get_candlestick_series_entry_from_close(next_timestamp, prev_close));
+                next_timestamp += data.Data.interval;
+            }
+        }
+
+        candlestick_series_data.push(get_candlestick_series_entry_from_kv(kv[0], kv[1]));
+        volume_series_data.push(get_volume_series_entry_from_kv(kv[0], kv[1]));
+
+        prev_time = kv[0];
+        prev_close = kv[1].close;
+    }
+
+    ctx.candlestick_series.setData(candlestick_series_data);
+    ctx.volume_series.setData(volume_series_data);
+}
+
+export function update_chart_data(ctx, data) {
+
+    let prev_time = undefined;
+    let prev_close = undefined;
+    for (let kv of data.Data.candlesticks.entries()) {
+        if (prev_time != undefined) {
+            let next_timestamp = prev_time + data.Data.interval;
+            while (kv[0] != next_timestamp) {
+                ctx.candlestick_series.update(get_candlestick_series_entry_from_close(next_timestamp, prev_close));
+                next_timestamp += data.Data.interval;
+            }
+        }
+
+        ctx.candlestick_series.update(get_candlestick_series_entry_from_kv(kv[0], kv[1]));
+        ctx.volume_series.update(get_volume_series_entry_from_kv(kv[0], kv[1]));
+
+        prev_time = kv[0];
+        prev_close = kv[1].close;
+    }
+}
+
+function get_candlestick_series_entry_from_kv(timestamp, candlestick) {
+    return { time: timestamp, open: candlestick.open, high: candlestick.high, low: candlestick.low, close: candlestick.close }
+}
+
+function get_volume_series_entry_from_kv(timestamp, candlestick) {
+    return { time: timestamp, value: candlestick.volume }
+}
+
+function get_candlestick_series_entry_from_close(timestamp, close) {
+    return { time: timestamp, open: close, high: close, low: close, close: close }
 }

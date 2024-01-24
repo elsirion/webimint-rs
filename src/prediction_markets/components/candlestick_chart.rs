@@ -6,9 +6,11 @@ use fedimint_prediction_markets_common::{
     Candlestick, ContractOfOutcomeAmount, Outcome, Seconds, UnixTimestamp,
 };
 use leptos::*;
-use tracing::info;
+use serde::Serialize;
+use tracing::{info, warn};
 
 use crate::context::ClientContext;
+use crate::prediction_markets::js;
 
 const DELAY_BETWEEN_CANDLESTICK_REQUESTS: Duration = Duration::from_millis(500);
 
@@ -82,30 +84,55 @@ pub fn CandlestickChart(
             };
 
             if params_id == params_incrementer.get_untracked() {
-                chart_msg_stream.set(Some(ChartMsg::Candelsticks(c)))
+                chart_msg_stream.set(Some(ChartMsg::Data {
+                    interval: this_candlestick_interval,
+                    candlesticks: c,
+                }));
             }
         });
     });
 
-    create_effect(cx, move |_| {
-        if let Some(msg) = chart_msg_stream.get() {
-            info!("Chart message recieved: {:?}", msg)
+    let chart_ctx = create_rw_signal(cx, None);
+    let chart_div = view! { cx, <div class="w-[600] h-80" /> }
+        .id("prediction_markets_chart")
+        .on_mount(move |_| {
+            chart_ctx.set(Some(js::create_chart()));
+        });
+
+    create_effect::<ChartMsg>(cx, move |prev_msg| {
+        let Some(msg) = chart_msg_stream.get() else {
+            return ChartMsg::ClearChart;
+        };
+        let Some(ctx) = chart_ctx.get() else {
+            warn!("CandlestickChart: Recieved ChartMsg before chart_ctx was ready");
+            return ChartMsg::ClearChart;
+        };
+        if let ChartMsg::Data {
+            interval: _,
+            candlesticks: _,
+        } = &msg
+        {
+            let data = serde_wasm_bindgen::to_value(&msg).unwrap();
+            match prev_msg {
+                Some(ChartMsg::Data {
+                    interval: _,
+                    candlesticks: _,
+                }) => js::update_chart_data(ctx, data),
+                _ => js::set_chart_data(ctx, data),
+            }
         }
+
+        msg
     });
 
-    let mut chart_div = view! { cx, <div />};
-    chart_div = chart_div.id("chart");
-
-    // js::create_chart();
-
-    view! {
-        cx,
-        {chart_div}
-    }
+    chart_div
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 enum ChartMsg {
-    Candelsticks(BTreeMap<UnixTimestamp, Candlestick>),
+    Data {
+        interval: Seconds,
+        candlesticks: BTreeMap<UnixTimestamp, Candlestick>,
+    },
     ClearChart,
 }
