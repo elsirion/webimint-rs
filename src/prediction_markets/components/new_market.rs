@@ -18,13 +18,7 @@ pub fn NewMarket(cx: Scope) -> impl IntoView {
     let contract_price = create_rw_signal(cx, "1000".to_owned());
     let outcomes = create_rw_signal(cx, "2".to_owned());
     let payout_control_weights: RwSignal<Vec<(RwSignal<String>, RwSignal<String>)>> =
-        create_rw_signal(
-            cx,
-            vec![(
-                create_rw_signal(cx, "self".to_owned()),
-                create_rw_signal(cx, "1".to_owned()),
-            )],
-        );
+        create_rw_signal(cx, vec![]);
     let weight_required_for_payout = create_rw_signal(cx, "1".to_owned());
     let payout_controls_fee_per_contract = create_rw_signal(cx, "0".to_owned());
 
@@ -51,9 +45,8 @@ pub fn NewMarket(cx: Scope) -> impl IntoView {
                     .await
                 {
                     Ok(Some(pk)) => pk,
-                    Ok(None) => {
-                        PublicKey::from_str(&payout_control.get()).map_err(|e| format!("error parsing payout control: {}", e))?
-                    }
+                    Ok(None) => PublicKey::from_str(&payout_control.get())
+                        .map_err(|e| format!("error parsing payout control: {}", e))?,
                     Err(e) => return Err(e.to_string()),
                 };
                 let weight = weight
@@ -236,7 +229,7 @@ pub fn NewMarket(cx: Scope) -> impl IntoView {
             <br />
 
             <button on:click=move |_| new_market_action.dispatch(())>"Create market"</button>
-            
+
             <p>
                 {move || new_market_action
                     .value()

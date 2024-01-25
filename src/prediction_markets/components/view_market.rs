@@ -38,3 +38,4 @@ pub fn ViewMarket(cx: Scope) -> impl IntoView {
         </Show>
     }
 }
+

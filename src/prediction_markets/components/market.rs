@@ -5,7 +5,7 @@ use fedimint_prediction_markets_common::Outcome;
 use leptos::*;
 
 use crate::context::ClientContext;
-use crate::prediction_markets::components::CandlestickChart;
+use crate::prediction_markets::components::{CandlestickChart, NewOrder};
 use crate::utils::empty_view;
 
 #[component]
@@ -44,9 +44,14 @@ pub fn Market(cx: Scope, market_outpoint: Memo<OutPoint>) -> impl IntoView {
         >
             <h1 class="text-2xl">{move || market.get().map(|m| m.information.title)}</h1>
 
-            <p>{move || market.get().map(|m| m.information.description)}</p>
+            <p class="border-2">{move || market.get().map(|m| m.information.description)}</p>
 
-            <table class="p-2 bor">
+            <p>{move || market.get().map(|m| format!("Contract price: {}", m.contract_price))}</p>
+            <p>{move || market.get().map(|m| format!("Payout control's fee per contract: {}", m.payout_controls_fee_per_contract))}</p>
+
+            <br />
+            <p>{move || market.get().map(|m| format!("Cumulative agreeing weight required for payout: {}", m.payout_controls_fee_per_contract))}</p>
+            <table class="p-2">
                 <thead>
                     <th>"Payout Control Public Key"</th>
                     <th>"Weight"</th>
@@ -72,7 +77,12 @@ pub fn Market(cx: Scope, market_outpoint: Memo<OutPoint>) -> impl IntoView {
                     m.information.outcome_titles.into_iter().enumerate().map(|(i, outcome_title)| {
                         view! {
                             cx,
-                            <div on:click=move |_| {outcome.set(i as Outcome)} class="p-4 border-1">{outcome_title}</div>
+                            <button 
+                                class="border-2 border-black p-4"
+                                on:click=move |_| {outcome.set(i as Outcome)} 
+                            >
+                                {outcome_title}
+                            </button>
                         }
                     }).collect_view(cx)
                 })}
@@ -84,12 +94,19 @@ pub fn Market(cx: Scope, market_outpoint: Memo<OutPoint>) -> impl IntoView {
 
                         view! {
                             cx,
-                            <div on:click=move |_| {candlestick_interval.set(ci)} class="p-4 border-1">{ci}s</div>
+                            <button 
+                                class="border-2 border-black p-3" 
+                                on:click=move |_| {candlestick_interval.set(ci)} 
+                            >
+                                {ci}"s"
+                            </button>
                         }
                     }).collect_view(cx)}
             </div>
 
             <CandlestickChart market_outpoint=market_outpoint outcome=outcome candlestick_interval=candlestick_interval/>
+
+            <NewOrder market_outpoint=market_outpoint outcome=outcome />
         </Show>
     }
 }
