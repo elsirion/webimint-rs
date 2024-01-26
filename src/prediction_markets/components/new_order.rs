@@ -52,8 +52,18 @@ pub fn NewOrder(
 
             <label>"Side"</label>
             <br />
-            <button class="p-2 border-2" on:click=move |_| form_side.set("buy".into())>"Buy"</button>
-            <button class="p-2 border-2" on:click=move |_| form_side.set("sell".into())>"Sell"</button>
+            <button 
+                class={move || format!("p-2 border-2 {}", if form_side.get() == "buy" {"bg-slate-200"} else {""})} 
+                on:click=move |_| form_side.set("buy".into())
+            >
+                "Buy"
+            </button>
+            <button 
+                class={move || format!("p-2 border-2 {}", if form_side.get() == "sell" {"bg-slate-200"} else {""})} 
+                on:click=move |_| form_side.set("sell".into())
+            >
+                "Sell"
+            </button>
             <br />
 
             <label>"Price"</label>
