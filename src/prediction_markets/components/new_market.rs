@@ -80,7 +80,7 @@ pub fn NewMarket(cx: Scope) -> impl IntoView {
             expected_payout_timestamp: UnixTimestamp::ZERO,
         };
 
-        Ok(client
+        let r = Ok(client
             .get_value()
             .new_market(
                 contract_price,
@@ -91,7 +91,20 @@ pub fn NewMarket(cx: Scope) -> impl IntoView {
                 market_information,
             )
             .await
-            .map_err(|e| format!("Issue creating market: {:?}", e))?)
+            .map_err(|e| format!("Issue creating market: {:?}", e))?);
+
+        if let Ok(market_outpoint) = r.clone() {
+            client
+                .get_value()
+                .save_market(market_outpoint)
+                .await
+                .map_err(|e| format!("Issue saving new market: {:?}", e))?;
+
+            // to cache market
+            _ = client.get_value().get_market(market_outpoint, false).await;
+        }
+
+        r
     });
 
     create_effect(cx, move |_| {
@@ -236,7 +249,7 @@ pub fn NewMarket(cx: Scope) -> impl IntoView {
                     .get()
                     .map(|r| {
                         match r {
-                            Ok(outpoint) => format!("Market created. txid: {}", outpoint.txid),
+                            Ok(outpoint) => format!("Market created successfully: {}. Market has been saved.", outpoint.txid),
                             Err(e) => e,
                         }
                     })

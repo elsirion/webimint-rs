@@ -45,6 +45,7 @@ gloo-storage = "0.3.0"
 rand = "0.8.5"
 secp256k1 = "0.24.3"
 serde-wasm-bindgen = "0.6.3"
+js-sys = "0.3.67"
 
 [build-dependencies]
 fedimint-build = "0.2.1-rc1"

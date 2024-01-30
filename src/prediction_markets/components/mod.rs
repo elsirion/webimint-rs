@@ -6,6 +6,7 @@ pub mod new_market;
 pub mod view_market;
 pub mod new_order;
 pub mod select_market;
+pub mod payout_controls;
 
 pub use home::*;
 pub use client_payout_control::*;
@@ -15,3 +16,4 @@ pub use new_market::*;
 pub use view_market::*;
 pub use new_order::*;
 pub use select_market::*;
+pub use payout_controls::*;

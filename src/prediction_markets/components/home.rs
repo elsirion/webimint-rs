@@ -2,7 +2,7 @@
 use leptos::*;
 
 use crate::context::ClientContext;
-use crate::prediction_markets::components::{ClientPayoutControl, NewMarket, ViewMarket};
+use crate::prediction_markets::components::{PayoutControls, NewMarket, ViewMarket};
 use crate::utils::empty_view;
 
 #[component]
@@ -41,7 +41,7 @@ pub fn PredictionMarketsHome(cx: Scope) -> impl IntoView {
                     leading-tight hover:text-blue-500 {active}", 
                     active = if tab.get() == Tab::ClientPayoutControl  {"text-blue-400 border-blue-400"} else {"text-gray-400 border-gray-200 hover:border-gray-700"} )}
                 >
-                    "Client Payout Control"
+                    "Payout Controls"
                 </button>
                 <button
                     on:click=move |_| tab.set(Tab::NewMarket)
@@ -68,7 +68,7 @@ pub fn PredictionMarketsHome(cx: Scope) -> impl IntoView {
                     when=move || matches!{tab.get(), Tab::ClientPayoutControl}
                     fallback=|_| empty_view()
                 >
-                    <ClientPayoutControl />
+                    <PayoutControls />
                 </Show>
                 <Show
                     when=move || matches!{tab.get(), Tab::NewMarket}

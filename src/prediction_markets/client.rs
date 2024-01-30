@@ -122,7 +122,7 @@ pub enum PredictionMarketsRpcResponse {
     WaitCandlesticks(anyhow::Result<BTreeMap<UnixTimestamp, Candlestick>>),
     SaveMarket,
     UnsaveMarket,
-    GetSavedMarkets(BTreeMap<UnixTimestamp, OutPoint>),
+    GetSavedMarkets(Vec<(OutPoint, UnixTimestamp)>),
     SetNameToPayoutControl,
     GetNameToPayoutControl(Option<PublicKey>),
     GetNameToPayoutControlMap(HashMap<String, PublicKey>),
@@ -954,7 +954,7 @@ impl ClientRpc {
 
     pub async fn get_saved_markets(
         &self,
-    ) -> anyhow::Result<BTreeMap<UnixTimestamp, OutPoint>, RpcError> {
+    ) -> anyhow::Result<Vec<(OutPoint, UnixTimestamp)>, RpcError> {
         let (response_sender, response_receiver) = oneshot::channel();
         self.sender
             .send((

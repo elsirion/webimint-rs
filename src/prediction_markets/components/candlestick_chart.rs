@@ -93,7 +93,7 @@ pub fn CandlestickChart(
     });
 
     let chart_ctx = create_rw_signal(cx, None);
-    let chart_div = view! { cx, <div class="w-[600] h-80" /> }
+    let chart_div = view! { cx, <div class="h-[500px]" /> }
         .id("prediction_markets_chart")
         .on_mount(move |_| {
             chart_ctx.set(Some(js::create_chart()));
