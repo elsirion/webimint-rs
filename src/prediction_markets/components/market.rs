@@ -1,9 +1,12 @@
+use std::collections::HashMap;
+
 use anyhow::anyhow;
 use fedimint_core::OutPoint;
-use fedimint_prediction_markets_common::config::GeneralConsensus;
 use fedimint_prediction_markets_common::Outcome;
 use leptos::*;
+use secp256k1::PublicKey;
 
+use super::PredictionMarketsStaticDataContext;
 use crate::context::ClientContext;
 use crate::prediction_markets::components::{CandlestickChart, NewOrder};
 use crate::prediction_markets::helpers::unix_timestamp_to_js_string;
@@ -12,7 +15,10 @@ use crate::utils::empty_view;
 #[component]
 pub fn Market(cx: Scope, market_outpoint: Memo<OutPoint>) -> impl IntoView {
     let ClientContext { client, .. } = expect_context::<ClientContext>(cx);
-    let general_consensus = expect_context::<GeneralConsensus>(cx);
+    let PredictionMarketsStaticDataContext {
+        client_payout_control: _,
+        general_consensus,
+    } = expect_context::<PredictionMarketsStaticDataContext>(cx);
 
     let get_market_resource = create_resource(
         cx,
@@ -37,6 +43,35 @@ pub fn Market(cx: Scope, market_outpoint: Memo<OutPoint>) -> impl IntoView {
             .unwrap()
             .to_owned(),
     );
+
+    let name_to_payout_control_map_resource = create_resource(
+        cx,
+        || (),
+        move |()| async move { client.get_value().get_name_to_payout_control_map().await },
+    );
+    let payout_control_to_name_memo = create_memo(cx, move |_| {
+        let Some(Ok(m)) = name_to_payout_control_map_resource.read(cx) else {
+            return None;
+        };
+
+        let reversed_m = m
+            .into_iter()
+            .map(|(k, v)| (v, k))
+            .collect::<HashMap<_, _>>();
+
+        Some(reversed_m)
+    });
+    let payout_control_string = move |payout_control: PublicKey| {
+        payout_control_to_name_memo
+            .with(move |m_opt| {
+                let Some(m) = m_opt else {
+                    return None;
+                };
+
+                m.get(&payout_control).map(|name| name.to_owned())
+            })
+            .unwrap_or(payout_control.to_string())
+    };
 
     view! { cx,
         <Show
@@ -74,11 +109,11 @@ pub fn Market(cx: Scope, market_outpoint: Memo<OutPoint>) -> impl IntoView {
                     {move || market.get().map(|m| {
                         m.payout_controls_weights
                             .into_iter()
-                            .map(move |(k, v)| view! {
+                            .map(move |(public_key, weight)| view! {
                                 cx,
                                 <tr>
-                                    <td class="border-[1px] p-2">{k.to_string()}</td>
-                                    <td class="border-[1px] p-2">{v}</td>
+                                    <td class="border-[1px] p-2">{payout_control_string(public_key)}</td>
+                                    <td class="border-[1px] p-2">{weight}</td>
                                 </tr>
                             })
                             .collect_view(cx)
@@ -93,7 +128,7 @@ pub fn Market(cx: Scope, market_outpoint: Memo<OutPoint>) -> impl IntoView {
                             view! {
                                 cx,
                                 <button
-                                    class="border-2 border-black p-4"
+                                    class={format!("border-2 border-black p-4 {}", if outcome.get() == i as u8 {"bg-slate-200"} else {""})}
                                     on:click=move |_| {outcome.set(i as Outcome)}
                                 >
                                     {outcome_title}
@@ -110,7 +145,7 @@ pub fn Market(cx: Scope, market_outpoint: Memo<OutPoint>) -> impl IntoView {
                             view! {
                                 cx,
                                 <button
-                                    class="border-2 border-black p-3"
+                                    class={format!("border-2 border-black p-3 {}", if candlestick_interval.get() == ci {"bg-slate-200"} else {""})}
                                     on:click=move |_| {candlestick_interval.set(ci)}
                                 >
                                     {ci}"s"

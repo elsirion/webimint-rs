@@ -1,28 +1,37 @@
-
 use leptos::*;
 
+use super::PredictionMarketsStaticDataContext;
 use crate::context::ClientContext;
-use crate::prediction_markets::components::{PayoutControls, NewMarket, ViewMarket};
+use crate::prediction_markets::components::{NewMarket, PayoutControls, ViewMarket};
 use crate::utils::empty_view;
 
 #[component]
 pub fn PredictionMarketsHome(cx: Scope) -> impl IntoView {
     let ClientContext { client, .. } = expect_context::<ClientContext>(cx);
 
-    let general_consensus_resource = create_resource(
+    let static_data_resource = create_resource(
         cx,
         || (),
         move |_| async move {
-            match client.get_value().get_general_consensus().await {
-                Ok(gc) => {
-                    provide_context(cx, gc.to_owned());
-                    Some(gc)
-                }
-                Err(e) => {
-                    error!("failure to get general consensus: {e}");
-                    None
-                }
-            }
+            let Ok(client_payout_control) = client.get_value().get_client_payout_control().await
+            else {
+                error!("failed to get client payout control");
+                return Err(());
+            };
+            let Ok(general_consensus) = client.get_value().get_general_consensus().await else {
+                error!("failed to get general consensus");
+                return Err(());
+            };
+
+            provide_context(
+                cx,
+                PredictionMarketsStaticDataContext {
+                    client_payout_control,
+                    general_consensus,
+                },
+            );
+
+            Ok(())
         },
     );
 
@@ -30,7 +39,7 @@ pub fn PredictionMarketsHome(cx: Scope) -> impl IntoView {
 
     view! { cx,
         <Show
-            when=move || matches!{general_consensus_resource.read(cx), Some(Some(_))}
+            when=move || matches!{static_data_resource.read(cx), Some(Ok(()))}
             fallback=|_| empty_view()
         >
             <div class="flex">
