@@ -3,13 +3,13 @@ use std::str::FromStr;
 
 use fedimint_core::Amount;
 use fedimint_prediction_markets_common::{
-    MarketInformation, Outcome, UnixTimestamp, Weight, WeightRequiredForPayout,
+    MarketInformation, Outcome, Weight, WeightRequiredForPayout,
 };
 use leptos::*;
 use secp256k1::PublicKey;
-use tracing::info;
 
-use crate::{context::ClientContext, prediction_markets::helpers::js_string_to_unix_timestamp};
+use crate::context::ClientContext;
+use crate::prediction_markets::helpers::js_string_to_unix_timestamp;
 
 #[component]
 pub fn NewMarket(cx: Scope) -> impl IntoView {
@@ -38,12 +38,13 @@ pub fn NewMarket(cx: Scope) -> impl IntoView {
             .map_err(|e| format!("error parsing number of outcomes: {}", e))?;
         let payout_control_weights = {
             let mut b = BTreeMap::new();
-            for (payout_control, weight) in form_payout_control_weights.get_untracked().into_iter() {
+            for (payout_control, weight) in form_payout_control_weights.get_untracked().into_iter()
+            {
                 let payout_control = match client
                     .get_value()
                     .get_name_to_payout_control(payout_control.get_untracked())
                     .await
-                { 
+                {
                     Ok(Some(pk)) => pk,
                     Ok(None) => PublicKey::from_str(&payout_control.get())
                         .map_err(|e| format!("error parsing payout control: {}", e))?,
@@ -77,7 +78,9 @@ pub fn NewMarket(cx: Scope) -> impl IntoView {
                 .into_iter()
                 .map(|t| t.get_untracked())
                 .collect::<Vec<_>>(),
-            expected_payout_timestamp: js_string_to_unix_timestamp(form_expected_payout_timestamp.get_untracked()),
+            expected_payout_timestamp: js_string_to_unix_timestamp(
+                form_expected_payout_timestamp.get_untracked(),
+            ),
         };
 
         let r = Ok(client
@@ -239,12 +242,17 @@ pub fn NewMarket(cx: Scope) -> impl IntoView {
             <label>"Expected payout timestamp"</label>
             <br />
             <input type="datetime-local"
-                on:input=move |ev| form_expected_payout_timestamp.set(event_target_value(&ev))                
+                on:input=move |ev| form_expected_payout_timestamp.set(event_target_value(&ev))
                 prop:value=move || form_expected_payout_timestamp.get()
             />
             <br />
 
-            <button on:click=move |_| new_market_action.dispatch(())>"Create market"</button>
+            <button
+                class="border-[1px] hover:bg-slate-200"
+                on:click=move |_| new_market_action.dispatch(())
+            >
+                "Create market"
+            </button>
 
             <p>
                 {move || new_market_action

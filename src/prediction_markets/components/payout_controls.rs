@@ -14,7 +14,7 @@ pub fn PayoutControls(cx: Scope) -> impl IntoView {
 
     view! {
         cx,
-        <div class="flex flex-col gap-1">
+        <div class="flex flex-col gap-2">
             <ClientPayoutControl />
             <SetNameToPayoutControl reload_name_to_payout_control_table=reload_name_to_payout_control_table />
             <NameToPayoutControlTable reload_name_to_payout_control_table=reload_name_to_payout_control_table />
@@ -31,7 +31,7 @@ pub fn ClientPayoutControl(cx: Scope) -> impl IntoView {
 
     view! { cx,
         <div class="border-[1px] p-2">
-            <p class="border-b text-lg">Your Payout Control</p>
+            <p class="border-b text-lg">"Your Payout Control"</p>
             <div class="flex gap-3 p-2">
                 <textarea readonly rows="1" class="flex-1 resize-none rounded p-3 bg-gray-100">
                     {client_payout_control.to_string()}
@@ -78,30 +78,31 @@ pub fn SetNameToPayoutControl(
 
     view! { cx,
         <div class="border-[1px] p-2">
-            <span class="border-b p-2">"Assign name to payout control"</span>
-            <br />
+            <p class="border-b text-lg">"Assign Name to Payout Control"</p>
+            <div>
+                <label>"Name"</label>
+                <br />
+                <input
+                    on:input=move |ev| form_name.set(event_target_value(&ev))
+                    prop:value=move || form_name.get()
+                />
+                <br />
 
-            <label>"Name"</label>
-            <br />
-            <input
-                on:input=move |ev| form_name.set(event_target_value(&ev))
-                prop:value=move || form_name.get()
-            />
-            <br />
+                <label>"Payout Control"</label>
+                <br />
+                <input
+                    on:input=move |ev| form_payout_control.set(event_target_value(&ev))
+                    prop:value=move || form_payout_control.get()
+                />
+                <br />
 
-            <label>"Payout Control"</label>
-            <br />
-            <input
-                on:input=move |ev| form_payout_control.set(event_target_value(&ev))
-                prop:value=move || form_payout_control.get()
-            />
-            <br />
-
-            <button
-                on:click=move |_| set_name_to_payout_control_action.dispatch(())
-            >
-                "Save"
-            </button>
+                <button
+                    class="border-[1px] hover:bg-slate-200"
+                    on:click=move |_| set_name_to_payout_control_action.dispatch(())
+                >
+                    "Save"
+                </button>
+            </div>
         </div>
     }
 }
@@ -142,11 +143,11 @@ pub fn NameToPayoutControlTable(
             fallback=|_| empty_view()
         >
             <table>
-                <tr>
+                <thead>
                     <th>""</th>
                     <th class="border-[1px] p-2">"Name"</th>
                     <th class="border-[1px] p-2">"Payout Control"</th>
-                </tr>
+                </thead>
                 {move || {
                     name_to_payout_control_map_resource
                         .read(cx)
@@ -159,7 +160,7 @@ pub fn NameToPayoutControlTable(
                                 cx,
                                 <tr>
                                     <td 
-                                        class="border-[1px] p-2"
+                                        class="border-[1px] p-2 cursor-pointer"
                                         on:click=move |_| set_name_to_none_action.dispatch(action_name.to_owned())
                                     >
                                         "X"

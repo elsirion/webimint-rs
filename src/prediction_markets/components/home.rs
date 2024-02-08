@@ -1,9 +1,17 @@
+use fedimint_prediction_markets_common::config::GeneralConsensus;
 use leptos::*;
+use secp256k1::PublicKey;
+use tracing::warn;
 
-use super::PredictionMarketsStaticDataContext;
 use crate::context::ClientContext;
 use crate::prediction_markets::components::{NewMarket, PayoutControls, ViewMarket};
 use crate::utils::empty_view;
+
+#[derive(Debug, Clone)]
+pub struct PredictionMarketsStaticDataContext {
+    pub client_payout_control: PublicKey,
+    pub general_consensus: GeneralConsensus,
+}
 
 #[component]
 pub fn PredictionMarketsHome(cx: Scope) -> impl IntoView {
@@ -34,6 +42,27 @@ pub fn PredictionMarketsHome(cx: Scope) -> impl IntoView {
             Ok(())
         },
     );
+
+    let sync_and_withdraw_available_bitcoin = create_action(cx, move |()| async move {
+        _ = client
+            .get_value()
+            .sync_orders(true, None, None)
+            .await
+            .map_err(|e| warn!("Error syncing orders: {e}"));
+
+        _ = client
+            .get_value()
+            .send_order_bitcoin_balance_to_primary_module()
+            .await
+            .map_err(|e| warn!("Error withdrawing order balance: {e}"));
+
+        _ = client
+            .get_value()
+            .send_payout_control_bitcoin_balance_to_primary_module()
+            .await
+            .map_err(|e| warn!("Error withdrawing payout control balance: {e}"))
+    });
+    sync_and_withdraw_available_bitcoin.dispatch(());
 
     let tab = create_rw_signal(cx, Tab::ClientPayoutControl);
 
