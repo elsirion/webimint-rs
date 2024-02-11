@@ -130,6 +130,13 @@ pub fn SelectMarket(
 ) -> impl IntoView {
     let ClientContext { client, .. } = expect_context::<ClientContext>(cx);
 
+    #[derive(Debug, Clone, PartialEq)]
+    enum Tabs {
+        SavedMarkets,
+        ClientPayoutControlMarkets,
+    }
+    let current_tab = create_rw_signal(cx, Tabs::SavedMarkets);
+
     let form_market_txid = move |txid: String| {
         let Ok(txid) = TransactionId::from_str(txid.as_ref()) else {
             return;
@@ -145,26 +152,70 @@ pub fn SelectMarket(
         })
     });
 
+    let client_payout_control_markets_resource = create_resource(
+        cx,
+        || (),
+        move |()| async move {
+            client
+                .get_value()
+                .get_client_payout_control_markets(false, UnixTimestamp::ZERO)
+                .await
+        },
+    );
+    let client_payout_control_markets_sorted_by_creation_timestamp = create_memo(cx, move |_| {
+        client_payout_control_markets_resource
+            .with(cx, move |r| {
+                let mut v = vec![];
+                let Ok(btree) = r else { return v };
+
+                for (creation, market_set) in btree.iter().rev() {
+                    for market in market_set {
+                        v.push((market.to_owned(), creation.to_owned()))
+                    }
+                }
+
+                v
+            })
+            .unwrap_or(vec![])
+    });
+
     view! {
         cx,
-        <div class="flex items-center gap-2 border-[1px] p-2">
-            <label>"Go to market by txid:"</label>
-            <input type="text" class="flex-grow" on:input=move |ev| form_market_txid(event_target_value(&ev)) />
-        </div>
-        <Show
-            when=move || matches!{saved_markets.get(), Some(_)}
-            fallback=|_| empty_view()
-        >
-            <div class="flex-col border-[1px] p-2 mt-1">
-                <h1 class="text-center border-b text-lg">"Saved markets"</h1>
-                <table class="p-2 w-[100%]">
+        <div class="flex flex-col gap-2">
+            <div class="flex items-center gap-2 border-[1px] p-2">
+                <label>"Go to market by txid:"</label>
+                <input type="text" class="flex-grow" on:input=move |ev| form_market_txid(event_target_value(&ev)) />
+            </div>
+
+            <div class="flex">
+                <button
+                    class={move || format!("flex-grow border-b-2 p-3 font-body font-semibold leading-tight hover:text-blue-500 {}",
+                        if current_tab.get() == Tabs::SavedMarkets {"text-blue-400 border-blue-400"} else {"text-gray-400 border-gray-200 hover:border-gray-700"})}
+                    on:click=move |_| current_tab.set(Tabs::SavedMarkets)
+                >
+                    "Saved Markets"
+                </button>
+                <button
+                    class={move || format!("flex-grow border-b-2 p-3 font-body font-semibold leading-tight hover:text-blue-500 {}",
+                        if current_tab.get() == Tabs::ClientPayoutControlMarkets {"text-blue-400 border-blue-400"} else {"text-gray-400 border-gray-200 hover:border-gray-700"})}
+                    on:click=move |_| current_tab.set(Tabs::ClientPayoutControlMarkets)
+                >
+                    "Client Payout Control Markets"
+                </button>
+            </div>
+
+            <Show
+                when=move || matches!{current_tab.get(), Tabs::SavedMarkets} && matches!{saved_markets.get(), Some(_)}
+                fallback=|_| empty_view()
+            >
+                <table>
                     <thead>
-                        <th>"Market"</th>
-                        <th>"Saved Timestamp"</th>
+                        <th class="border-[1px] p-2">"Market"</th>
+                        <th class="border-[1px] p-2">"Saved Timestamp"</th>
                     </thead>
                     <For
                         each=move || saved_markets_sorted_by_saved_timestamp.get().unwrap()
-                        key=|(saved_market_outpoint, _)| saved_market_outpoint.to_owned()
+                        key=|(market_outpoint, _)| market_outpoint.to_owned()
                         view=move |cx, (saved_market_outpoint, saved_market_saved_timestamp)| {
                             let market_resource = create_resource(
                                 cx,
@@ -198,14 +249,66 @@ pub fn SelectMarket(
                         }
                     />
                 </table>
-            </div>
-        </Show>
+            </Show>
+
+            <Show
+                when=move || matches!{current_tab.get(), Tabs::ClientPayoutControlMarkets}
+                    && matches!{client_payout_control_markets_resource.read(cx), Some(_)}
+                fallback=|_| empty_view()
+            >
+                <table>
+                    <thead>
+                        <th class="border-[1px] p-2">"Market"</th>
+                        <th class="border-[1px] p-2">"Creation Timestamp"</th>
+                    </thead>
+                    <For
+                        each=move || client_payout_control_markets_sorted_by_creation_timestamp.get()
+                        key=|(market_outpoint, _)| market_outpoint.to_owned()
+                        view=move |cx, (client_payout_control_market_outpoint, client_payout_control_market_creation_timestamp)| {
+                            let market_resource = create_resource(
+                                cx,
+                                || (),
+                                move |()| async move {
+                                    client
+                                        .get_value()
+                                        .get_market(client_payout_control_market_outpoint, true)
+                                        .await
+                                },
+                            );
+                            let get_market_name = move || {
+                                market_resource.read(cx).map(|market| {
+                                    Some(market.ok()??.information.title)
+                                })
+                                .flatten()
+                                .unwrap_or(client_payout_control_market_outpoint.to_string())
+
+                            };
+
+                            view!{
+                                cx,
+                                <tr
+                                    class="cursor-pointer"
+                                    on:click=move |_| market_outpoint.set(Some(client_payout_control_market_outpoint))
+                                >
+                                    <td class="border-[1px] p-2">{get_market_name}</td>
+                                    <td class="border-[1px] p-2">{unix_timestamp_to_js_string(client_payout_control_market_creation_timestamp)}</td>
+                                </tr>
+                            }
+                        }
+                    />
+                </table>
+            </Show>
+        </div>
     }
 }
 
 #[component]
 pub fn Market(cx: Scope, market_outpoint: Memo<OutPoint>) -> impl IntoView {
     let ClientContext { client, .. } = expect_context::<ClientContext>(cx);
+    let PredictionMarketsStaticDataContext {
+        client_payout_control,
+        general_consensus: _,
+    } = expect_context::<PredictionMarketsStaticDataContext>(cx);
 
     let run_sync_orders = create_rw_signal(cx, ());
     let outcome_stats: RwSignal<Vec<(ContractOfOutcomeAmount, SignedAmount)>> =
@@ -255,6 +358,74 @@ pub fn Market(cx: Scope, market_outpoint: Memo<OutPoint>) -> impl IntoView {
             .unwrap_or(payout_control.to_string())
     };
 
+    let market_payout_control_proposals_resource = create_resource(
+        cx,
+        move || market_outpoint.get(),
+        move |market_outpoint| async move {
+            client
+                .get_value()
+                .get_market_payout_control_proposals(market_outpoint, false)
+                .await
+        },
+    );
+    let payout_control_proposal_string = move |payout_control: PublicKey| {
+        market_payout_control_proposals_resource.with(cx, move |r| {
+            r.as_ref()
+                .map(move |m| match m.get(&payout_control) {
+                    Some(v) => {
+                        let mut s = String::new();
+                        for a in v {
+                            s.push_str(format!("{a}, ").as_ref())
+                        }
+                        s.pop();
+                        s.pop();
+
+                        s
+                    }
+                    None => "No vote".to_owned(),
+                })
+                .unwrap_or("loading...".to_owned())
+        })
+    };
+
+    let form_outcome_payouts = create_memo(cx, move |_| {
+        market.get().map(move |m| {
+            let mut v = vec![];
+            for _ in 0..m.outcomes {
+                v.push(create_rw_signal(cx, "".to_owned()))
+            }
+            v
+        })
+    });
+    let propose_payout_action = create_action(cx, move |()| async move {
+        let market_outpoint = market_outpoint.get();
+        let Some(outcome_payouts_strings) = form_outcome_payouts.get() else {
+            return Err("failed getting outcome payouts".to_owned());
+        };
+
+        let mut outcome_payouts = vec![];
+        for s in outcome_payouts_strings {
+            let Ok(a) = Amount::from_str(s.get().as_ref()) else {
+                return Err("failed to pare outcome payout amount".to_owned());
+            };
+
+            outcome_payouts.push(a);
+        }
+
+        let r = client
+            .get_value()
+            .propose_payout(market_outpoint, outcome_payouts)
+            .await
+            .map_err(|e| format!("{e:?}"));
+
+        if matches!(r, Ok(_)) {
+            get_market_resource.refetch();
+            market_payout_control_proposals_resource.refetch();
+        }
+
+        r
+    });
+
     view! { cx,
         <Show
             when=move || matches!{market.get(), Some(_)}
@@ -271,7 +442,7 @@ pub fn Market(cx: Scope, market_outpoint: Memo<OutPoint>) -> impl IntoView {
                 <table>
                     <tr>
                         <th class="border-[1px] p-2">"ID"</th>
-                        <td class="border-[1px] p-2">{move || market_outpoint.get().txid.to_string()}</td>
+                        <td class="border-[1px] p-2 text-xs">{move || market_outpoint.get().txid.to_string()}</td>
                     </tr>
                     <tr>
                         <th class="border-[1px] p-2">"Contract price"</th>
@@ -282,19 +453,20 @@ pub fn Market(cx: Scope, market_outpoint: Memo<OutPoint>) -> impl IntoView {
                         <td class="border-[1px] p-2">{move || market.get().unwrap().payout_controls_fee_per_contract.to_string()}</td>
                     </tr>
                     <tr>
-                        <th class="border-[1px] p-2">"Cumulative agreeing weight required for payout"</th>
-                        <td class="border-[1px] p-2">{move || market.get().unwrap().weight_required_for_payout.to_string()}</td>
-                    </tr>
-                    <tr>
                         <th class="border-[1px] p-2">"Current open contracts"</th>
                         <td class="border-[1px] p-2">{move || market.get().unwrap().open_contracts.0.to_string()}</td>
                     </tr>
+                    <tr>
+                        <th class="border-[1px] p-2">"Cumulative agreeing weight required for payout"</th>
+                        <td class="border-[1px] p-2">{move || market.get().unwrap().weight_required_for_payout.to_string()}</td>
+                    </tr>
                 </table>
 
-                <table class="mt-2 p-2">
+                <table class="overflow-auto">
                     <thead>
-                        <th>"Payout Control Public Key"</th>
-                        <th>"Weight"</th>
+                        <th class="border p-1 text-sm">"Payout Control Public Key"</th>
+                        <th class="border p-1 text-sm">"Weight"</th>
+                        <th class="border p-1 text-sm">"Current Payout Proposal"</th>
                     </thead>
                     {move || market.get().map(|m| {
                         m.payout_controls_weights
@@ -302,15 +474,114 @@ pub fn Market(cx: Scope, market_outpoint: Memo<OutPoint>) -> impl IntoView {
                             .map(move |(public_key, weight)| view! {
                                 cx,
                                 <tr>
-                                    <td class="border p-2">{payout_control_string(public_key)}</td>
-                                    <td class="border p-2">{weight}</td>
+                                    <td class="border p-1 text-sm">{payout_control_string(public_key)}</td>
+                                    <td class="border p-1 text-sm">{weight}</td>
+                                    <td class="border p-1 text-sm">{payout_control_proposal_string(public_key)}</td>
                                 </tr>
                             })
                             .collect_view(cx)
                     })}
                 </table>
 
-                <p>"Expected payout time: "{move || unix_timestamp_to_js_string(market.get().unwrap().information.expected_payout_timestamp)}</p>
+                <div class="flex flex-col gap-1 border p-2">
+                    <Show
+                        when=move || matches!{market.get().unwrap().payout, None}
+                        fallback=|_| empty_view()
+                    >
+                        <h2 class="font-bold">"A payout has not yet occured."</h2>
+                        <p>"The market is expected to payout at "{move || unix_timestamp_to_js_string(market.get().unwrap().information.expected_payout_timestamp)}"."</p>
+
+                        <Show
+                            when=move || market.get().unwrap().payout_controls_weights.contains_key(&client_payout_control)
+                            fallback=|_| empty_view()
+                        >
+                            <h2 class="pt-3 font-bold">"Propose a payout"</h2>
+                            <table class="overflow-auto">
+                                <thead>
+                                    {move || market.get().unwrap().information.outcome_titles.into_iter()
+                                        .map(
+                                            move |t| {
+                                                view! {
+                                                    cx,
+                                                    <th class="border p-1">{t}</th>
+                                                }
+                                            }
+                                        ).collect_view(cx)
+                                    }
+                                </thead>
+                                <tr>
+                                    {move || form_outcome_payouts.get()
+                                        .map(|outcome_payouts| outcome_payouts.into_iter()
+                                            .map(move |outcome_payout| {
+                                                    view! {
+                                                        cx,
+                                                        <td class="border p-1">
+                                                            <input
+                                                                type="number"
+                                                                class="p-1 w-[100%]"
+                                                                on:input=move |ev| outcome_payout.set(event_target_value(&ev))
+                                                                prop:value=move || outcome_payout.get()
+                                                            />
+                                                        </td>
+                                                    }
+                                                }
+                                            ).collect_view(cx)
+                                        )
+                                    }
+                                </tr>
+                            </table>
+                            <button
+                                class="border-[1px] p-2 hover:bg-slate-200"
+                                on:click=move |_| {
+                                    propose_payout_action.value().set(None);
+                                    propose_payout_action.dispatch(());
+                                }
+                            >
+                                "Propose Payout"
+                            </button>
+                            <p>
+                                {move || propose_payout_action.value().get().map(|v| {
+                                    match v {
+                                        Ok(_) => format!("Successfully proposed payout"),
+                                        Err(e) => format!("Error proposing payout: {e}")
+                                    }
+                                })}
+                            </p>
+                        </Show>
+                    </Show>
+
+                    <Show
+                        when=move || matches!{market.get().unwrap().payout, Some(_)}
+                        fallback=|_| empty_view()
+                    >
+                        <h2 class="font-bold">"The market payout has occured."</h2>
+                        <p>"The payout occured at "{unix_timestamp_to_js_string(market.get().unwrap().payout.unwrap().occurred_consensus_timestamp)}"."</p>
+                        <table class="overflow-auto">
+                            <thead>
+                                {move || market.get().unwrap().information.outcome_titles.into_iter()
+                                    .map(move |t| {
+                                        view! {
+                                            cx,
+                                            <th class="border p-1">{t}</th>
+                                        }
+                                    }).collect_view(cx)
+                                }
+                            </thead>
+                            <tr>
+                                {move || market.get().unwrap().payout.unwrap().outcome_payouts.into_iter()
+                                    .map(
+                                        move |a| {
+                                            view! {
+                                                cx,
+                                                <td class="border p-1">{format!("{a}")}</td>
+                                            }
+                                        }
+                                    ).collect_view(cx)
+                                }
+                            </tr>
+                        </table>
+                    </Show>
+                </div>
 
                 <div class="flex">
                     {move || market.get().map(|m| {
@@ -318,7 +589,7 @@ pub fn Market(cx: Scope, market_outpoint: Memo<OutPoint>) -> impl IntoView {
                             view! {
                                 cx,
                                 <button
-                                    class={format!("border-2 border-black p-4 {}", if outcome.get() == i as u8 {"bg-slate-200"} else {""})}
+                                    class={format!("border-2 p-4 border-black {}", if outcome.get() == i as u8 {"bg-slate-100"} else {"bg-slate-400"})}
                                     on:click=move |_| {outcome.set(i as Outcome)}
                                 >
                                     {outcome_title}
@@ -337,28 +608,28 @@ pub fn Market(cx: Scope, market_outpoint: Memo<OutPoint>) -> impl IntoView {
     }
 }
 
-const DELAY_BETWEEN_CANDLESTICK_REQUESTS: Duration = Duration::from_millis(500);
-
-#[derive(Debug, Clone, Serialize)]
-enum ChartMsg {
-    Data {
-        interval: Seconds,
-        candlesticks: BTreeMap<UnixTimestamp, Candlestick>,
-    },
-    ClearChart,
-}
-
 #[component]
 pub fn CandlestickChart(
     cx: Scope,
     market_outpoint: Memo<OutPoint>,
     outcome: RwSignal<Outcome>,
 ) -> impl IntoView {
+    const DELAY_BETWEEN_CANDLESTICK_REQUESTS: Duration = Duration::from_millis(500);
+
     let ClientContext { client, .. } = expect_context::<ClientContext>(cx);
     let PredictionMarketsStaticDataContext {
         client_payout_control: _,
         general_consensus,
     } = expect_context::<PredictionMarketsStaticDataContext>(cx);
+
+    #[derive(Debug, Clone, Serialize)]
+    enum ChartMsg {
+        Data {
+            interval: Seconds,
+            candlesticks: BTreeMap<UnixTimestamp, Candlestick>,
+        },
+        ClearChart,
+    }
 
     let candlestick_interval = create_rw_signal(
         cx,
@@ -439,11 +710,23 @@ pub fn CandlestickChart(
     });
 
     let chart_ctx = create_rw_signal(cx, None);
-    let chart_div = view! { cx, <div class="h-[500px]" /> }
-        .id("prediction_markets_chart")
-        .on_mount(move |_| {
-            chart_ctx.set(Some(js::create_chart()));
-        });
+    let chart_div = view! {
+        cx,
+        <div class="relative">
+            <div
+                class="h-[500px]"
+                prop:id="prediction_markets_chart"
+            />
+            <div class="absolute left-3 top-3 text-sm text-white z-10">
+                <span prop:id="prediction_markets_chart_candlestick_series_info"/>
+                <br />
+                <span prop:id="prediction_markets_chart_volume_series_info"/>
+            </div>
+        </div>
+    }
+    .on_mount(move |_| {
+        chart_ctx.set(Some(js::create_chart()));
+    });
 
     create_effect::<ChartMsg>(cx, move |prev_msg| {
         let Some(msg) = chart_msg_stream.get() else {
@@ -481,7 +764,7 @@ pub fn CandlestickChart(
                     view! {
                         cx,
                         <button
-                            class={move || format!("border-2 border-black p-3 {}", if candlestick_interval.get() == ci {"bg-slate-200"} else {""})}
+                            class={move || format!("border-2 p-3 border-black {}", if candlestick_interval.get() == ci {"bg-slate-100"} else {"bg-slate-400"})}
                             on:click=move |_| {candlestick_interval.set(ci)}
                         >
                             {ci}"s"
@@ -517,13 +800,13 @@ pub fn NewOrder(
                 form_price
                     .get_untracked()
                     .parse::<u64>()
-                    .map_err(|e| format!("Error parsing price: {}", e))?,
+                    .map_err(|e| format!("failed to parse price: {}", e))?,
             );
             let quantity = ContractOfOutcomeAmount(
                 form_quantity
                     .get_untracked()
                     .parse()
-                    .map_err(|e| format!("Error parsing quantity: {}", e))?,
+                    .map_err(|e| format!("failed to parse quantity: {}", e))?,
             );
 
             form_quantity.set("".to_owned());
@@ -532,7 +815,7 @@ pub fn NewOrder(
                 .get_value()
                 .new_order(market, outcome, side, price, quantity)
                 .await
-                .map_err(|e| format!("Error creating new order: {e:?}"))?;
+                .map_err(|e| format!("{e:?}"))?;
 
             run_sync_orders.set(());
 
@@ -558,13 +841,13 @@ pub fn NewOrder(
 
             <div>
                 <button
-                    class={move || format!("p-2 border-2 {}", if form_side.get() == Side::Buy {"bg-slate-200"} else {""})}
+                    class={move || format!("p-2 border-2 border-black {}", if form_side.get() == Side::Buy {"bg-green-500"} else {"bg-gray-400"})}
                     on:click=move |_| form_side.set(Side::Buy)
                 >
                     "Buy"
                 </button>
                 <button
-                    class={move || format!("p-2 border-2 {}", if form_side.get() == Side::Sell {"bg-slate-200"} else {""})}
+                    class={move || format!("p-2 border-2 border-black {}", if form_side.get() == Side::Sell {"bg-red-500"} else {"bg-gray-400"})}
                     on:click=move |_| form_side.set(Side::Sell)
                 >
                     "Sell"
@@ -580,8 +863,6 @@ pub fn NewOrder(
                     prop:value=move || form_price.get()
                 />
             </div>
-
-
 
             <div class="flex gap-2">
                 <label>"Quantity"</label>
@@ -623,9 +904,9 @@ pub fn AccountStats(
 ) -> impl IntoView {
     view! {
         cx,
-        <div class="flex flex-col border p-1">
-            <h2 class="p-1 font-bold">"Your Market Holdings and Stats"</h2>
-            <table>
+        <div class="flex flex-col gap-2 border p-1">
+            <h2 class="border-b font-bold">"Your Market Holdings and Stats"</h2>
+            <table class="overflow-auto">
                 <thead>
                     <th></th>
                     {move || market.get().map(
@@ -682,8 +963,6 @@ pub fn AccountStats(
     }
 }
 
-const DELAY_BETWEEN_SYNC_ORDER_REQUESTS: Duration = Duration::from_secs(15);
-
 #[component]
 pub fn MarketOrdersTable(
     cx: Scope,
@@ -693,6 +972,8 @@ pub fn MarketOrdersTable(
     market: Memo<Option<fedimint_prediction_markets_common::Market>>,
     outcome_stats: RwSignal<Vec<(ContractOfOutcomeAmount, SignedAmount)>>,
 ) -> impl IntoView {
+    const DELAY_BETWEEN_SYNC_ORDER_REQUESTS: Duration = Duration::from_secs(15);
+
     let ClientContext { client, .. } = expect_context::<ClientContext>(cx);
 
     let order_cache = create_rw_signal(cx, BTreeMap::<OrderIdClientSide, RwSignal<Order>>::new());
@@ -746,10 +1027,16 @@ pub fn MarketOrdersTable(
         }
     });
 
-    set_interval(
+    let sync_orders_interval_handle = set_interval_with_handle(
         move || sync_orders_action.dispatch(market_outpoint.get_untracked()),
         DELAY_BETWEEN_SYNC_ORDER_REQUESTS,
     );
+    on_cleanup(cx, move || {
+        let Ok(h) = sync_orders_interval_handle else {
+            return;
+        };
+        h.clear()
+    });
 
     create_effect(cx, move |_| {
         _ = run_sync_orders.get();
@@ -812,13 +1099,39 @@ pub fn MarketOrdersTable(
 
                     let outcome_stat = v.get_mut(order.outcome as usize).unwrap();
                     outcome_stat.0 = outcome_stat.0 + order.contract_of_outcome_balance;
-                    outcome_stat.1 = outcome_stat.1 + order.bitcoin_acquired;
+                    if order.side == Side::Sell {
+                        outcome_stat.0 = outcome_stat.0 + order.quantity_waiting_for_match
+                    }
+
+                    outcome_stat.1 = outcome_stat.1
+                        + order.bitcoin_acquired_from_order_matches
+                        + SignedAmount::from(order.bitcoin_acquired_from_payout);
                 }
 
                 outcome_stats.set(v);
             })
         })
     });
+
+    let average_price_per_fulfilled_string = |order_signal: RwSignal<Order>| {
+        let order = order_signal.get();
+
+        let mut all_price = order.bitcoin_acquired_from_order_matches.amount.msats as f64;
+        if order.bitcoin_acquired_from_order_matches.is_negative() {
+            all_price = -all_price;
+        }
+        if order.side == Side::Buy {
+            all_price = -all_price;
+        }
+
+        let quantity = order.quantity_fulfilled.0 as f64;
+
+        if quantity == 0f64 {
+            "".to_owned()
+        } else {
+            format!("{:.2} msats", all_price / quantity)
+        }
+    };
 
     view! {
         cx,
@@ -842,7 +1155,7 @@ pub fn MarketOrdersTable(
                     />
                 </div>
             </div>
-            <table>
+            <table class="overflow-auto">
                 <thead>
                     <th></th>
                     <th class="border p-1 text-sm">"ID"</th>
@@ -850,8 +1163,9 @@ pub fn MarketOrdersTable(
                     <th class="border p-1 text-sm">"Outcome"</th>
                     <th class="border p-1 text-sm">"Side"</th>
                     <th class="border p-1 text-sm">"Price"</th>
-                    <th class="border p-1 text-sm">"Quantity remaining"</th>
-                    <th class="border p-1 text-sm">"Profit"</th>
+                    <th class="border p-1 text-sm">"Remaining"</th>
+                    <th class="border p-1 text-sm">"Fulfilled"</th>
+                    <th class="border p-1 text-sm">"Avg. Price per Fulfilled"</th>
                 </thead>
                 <For
                     each=move || filtered_orders.get().into_iter().rev()
@@ -867,7 +1181,7 @@ pub fn MarketOrdersTable(
                                     fallback=move |_| view! {cx, <td></td>}
                                 >
                                     <td
-                                        class="border p-1 text-sm hover:bg-red-500 cursor-pointer"
+                                        class="border p-1 text-sm hover:bg-red-500 cursor-pointer text-center"
                                         on:click=move |_| cancel_order_action.dispatch(id)
                                     >
                                         "X"
@@ -888,7 +1202,8 @@ pub fn MarketOrdersTable(
                                 <td class="border p-1 text-sm">{format!("{:?}", order.side)}</td>
                                 <td class="border p-1 text-sm">{order.price.msats}</td>
                                 <td class="border p-1 text-sm">{move || order_signal.get().quantity_waiting_for_match.0}</td>
-                                <td class="border p-1 text-sm">{move || order_signal.get().bitcoin_acquired.to_string()}</td>
+                                <td class="border p-1 text-sm">{move || order_signal.get().quantity_fulfilled.0}</td>
+                                <td class="border p-1 text-sm">{move || average_price_per_fulfilled_string(order_signal)}</td>
                             </tr>
                         }
                     }

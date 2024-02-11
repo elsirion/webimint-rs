@@ -34,6 +34,26 @@ export function create_chart() {
         scaleMargins: { top: .85, bottom: 0 }
     })
 
+    chart.subscribeCrosshairMove(param => {
+        let candlestick_span = document.getElementById("prediction_markets_chart_candlestick_series_info")
+        let volume_span = document.getElementById("prediction_markets_chart_volume_series_info")
+
+        if (param.time) {
+            const candlestickData = param.seriesData.get(candlestickSeries)
+            const volumeData = param.seriesData.get(volumeSeries)
+
+            candlestick_span.innerText = `O: ${candlestickData.open}, C: ${candlestickData.close}, H: ${candlestickData.high}, L: ${candlestickData.low}`
+            if (volumeData !== undefined) {
+                volume_span.innerText = `Volume: ${volumeData.value}`
+            } else {
+                volume_span.innerText = "Volume: 0"
+            }
+        } else {
+            candlestick_span.innerText = ""
+            volume_span.innerText = ""
+        }
+    })
+
     return { chart: chart, candlestick_series: candlestickSeries, volume_series: volumeSeries }
 }
 

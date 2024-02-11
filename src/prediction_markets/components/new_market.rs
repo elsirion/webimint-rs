@@ -18,7 +18,13 @@ pub fn NewMarket(cx: Scope) -> impl IntoView {
     let form_contract_price = create_rw_signal(cx, "1000".to_owned());
     let form_outcomes = create_rw_signal(cx, "2".to_owned());
     let form_payout_control_weights: RwSignal<Vec<(RwSignal<String>, RwSignal<String>)>> =
-        create_rw_signal(cx, vec![]);
+        create_rw_signal(
+            cx,
+            vec![(
+                create_rw_signal(cx, "".to_owned()),
+                create_rw_signal(cx, "".to_owned()),
+            )],
+        );
     let form_weight_required_for_payout = create_rw_signal(cx, "1".to_owned());
     let form_payout_controls_fee_per_contract = create_rw_signal(cx, "0".to_owned());
 
@@ -124,60 +130,62 @@ pub fn NewMarket(cx: Scope) -> impl IntoView {
     });
 
     view! {cx,
-        <div class="block">
+        <div class="flex flex-col gap-1 border p-2">
             <label>"Title"</label>
-            <br />
             <input type="text"
                 on:input=move |ev| form_title.set(event_target_value(&ev))
                 prop:value=move || form_title.get()
             />
-            <br />
 
             <label>"Description"</label>
-            <br />
-            <input type="text"
+            <textarea
+                rows=4
                 on:input=move |ev| form_description.set(event_target_value(&ev))
                 prop:value=move || form_description.get()
             />
-            <br />
 
             <label>"Number of outcomes"</label>
-            <br />
             <input type="number"
                 on:input=move |ev| form_outcomes.set(event_target_value(&ev))
                 prop:value=move || form_outcomes.get()
             />
-            <br />
 
             <label>"Outcome titles"</label>
-            <br />
-            {move || {
-                form_outcome_titles
-                    .get()
-                    .into_iter()
-                    .map(|outcome_title| {
-                        view! {
-                            cx,
-                            <input type="text"
+            <div class="flex gap-2 flex-wrap">
+                {move || {
+                    form_outcome_titles
+                        .get()
+                        .into_iter()
+                        .enumerate()
+                        .map(|(i, outcome_title)| {
+                            view! {
+                                cx,
+                                <input 
+                                    type="text"
+                                    class="flex-[0_0_32%]"
                                     on:input=move |ev| outcome_title.set(event_target_value(&ev))
                                     prop:value=move || outcome_title.get()
-                            />
-                        }
-                    })
-                    .collect_view(cx)
-            }}
-            <br />
+                                    prop:placeholder={format!("outcome {i}")}
+                                />
+                            }
+                        })
+                        .collect_view(cx)
+                }}
+            </div>
 
-            <label>"Contract price"</label>
-            <br />
+            <label>"Contract price (msat)"</label>
             <input type="number"
                 on:input=move |ev| form_contract_price.set(event_target_value(&ev))
                 prop:value=move || form_contract_price.get()
             />
-            <br />
 
-            <label>"Payout control and their weights"</label>
-            <br />
+            <label>"Cumulative agreeing weight required for payout"</label>
+            <input type="number"
+                on:input=move |ev| form_weight_required_for_payout.set(event_target_value(&ev))
+                prop:value=move || form_weight_required_for_payout.get()
+            />
+
+            <label>"Payout controls and their weights"</label>
             {move || {
                 form_payout_control_weights
                     .get()
@@ -186,21 +194,30 @@ pub fn NewMarket(cx: Scope) -> impl IntoView {
                     .map(|(i,(payout_control, weight))| {
                         view! {
                             cx,
-                            <div class="flex">
-                                <button on:click=move |_| {
-                                    form_payout_control_weights.update(|v| {
-                                        v.remove(i);
-                                    })
-                                }>
+                            <div class="flex gap-2">
+                                <button
+                                    class="border p-2 hover:bg-red-500 cursor-pointer"
+                                    on:click=move |_| {
+                                        form_payout_control_weights.update(|v| {
+                                            v.remove(i);
+                                        })
+                                    }
+                                >
                                     "X"
                                 </button>
-                                <input type="text"
+                                <input
+                                    type="text"
+                                    class="flex-grow"
                                     on:input=move |ev| payout_control.set(event_target_value(&ev))
                                     prop:value=move || payout_control.get()
+                                    prop:placeholder={"raw payout control or name"}
                                 />
-                                <input type="text"
+                                <input
+                                    type="text"
+                                    class="flex-grow"
                                     on:input=move |ev| weight.set(event_target_value(&ev))
                                     prop:value=move || weight.get()
+                                    prop:placeholder={"weight"}
                                 />
                             </div>
                         }
@@ -208,9 +225,8 @@ pub fn NewMarket(cx: Scope) -> impl IntoView {
                     .collect_view(cx)
                 }
             }
-            <br />
             <button
-                class="font-bold text-lg"
+                class="font-bold text-lg border hover:bg-slate-200"
                 on:click=move |_| {
                     form_payout_control_weights.update(|v| {
                         v.push(
@@ -221,35 +237,25 @@ pub fn NewMarket(cx: Scope) -> impl IntoView {
             >
                 +
             </button>
-            <br />
 
-            <label>"Cumulative agreeing weight required for payout"</label>
-            <br />
-            <input type="number"
-                on:input=move |ev| form_weight_required_for_payout.set(event_target_value(&ev))
-                prop:value=move || form_weight_required_for_payout.get()
-            />
-            <br />
-
-            <label>"Fee per contract payed to payout controls on payout"</label>
-            <br />
+            <label>"Fee per contract payed to payout controls on payout (msat)"</label>
             <input type="number"
                 on:input=move |ev| form_payout_controls_fee_per_contract.set(event_target_value(&ev))
                 prop:value=move || form_payout_controls_fee_per_contract.get()
             />
-            <br />
 
             <label>"Expected payout timestamp"</label>
-            <br />
             <input type="datetime-local"
                 on:input=move |ev| form_expected_payout_timestamp.set(event_target_value(&ev))
                 prop:value=move || form_expected_payout_timestamp.get()
             />
-            <br />
 
             <button
                 class="border-[1px] hover:bg-slate-200"
-                on:click=move |_| new_market_action.dispatch(())
+                on:click=move |_| {
+                    new_market_action.value().set(None);
+                    new_market_action.dispatch(());
+                }
             >
                 "Create market"
             </button>
@@ -261,7 +267,7 @@ pub fn NewMarket(cx: Scope) -> impl IntoView {
                     .map(|r| {
                         match r {
                             Ok(outpoint) => format!("Market created successfully: {}. Market has been saved.", outpoint.txid),
-                            Err(e) => e,
+                            Err(e) => format!("Error creating market: {e}"),
                         }
                     })
                 }

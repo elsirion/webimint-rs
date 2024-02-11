@@ -48,9 +48,9 @@ pub fn Joined(cx: Scope) -> impl IntoView {
       <h1 class="font-heading text-gray-900 text-4xl font-semibold">{federation_label}</h1>
       <Balance class="my-12" />
       <ul
-        class="my-4 w-full flex flex-row"
+        class="my-2 w-full flex flex-row"
         >
-        <li class="w-1/4">
+        <li class="flex-auto">
         <button
           on:click=move |_| {
             set_tab.set(Tab::TxList);
@@ -66,7 +66,7 @@ pub fn Joined(cx: Scope) -> impl IntoView {
             Transactions
         </button>
       </li>
-        <li class="w-1/4">
+        <li class="flex-auto">
         <button
           on:click=move |_| {
             set_tab.set(Tab::Receive);
@@ -82,12 +82,12 @@ pub fn Joined(cx: Scope) -> impl IntoView {
           >Redeem
         </button>
       </li>
-        <li class="w-1/4">
+        <li class="flex-auto">
           <button
             on:click=move |_| {
               set_tab.set(Tab::Send);
             }
-            class={move || format!("my-2 block w-full text-center
+            class={move || format!("my-2 block w-full text-center 
             border-b-2 
             py-4
             ease
@@ -97,7 +97,7 @@ pub fn Joined(cx: Scope) -> impl IntoView {
             >LN Send
           </button>
         </li>
-        <li class="w-1/4">
+        <li class="flex-auto">
           <button
             on:click=move |_| {
               set_tab.set(Tab::ReceiveLn);
@@ -116,7 +116,7 @@ pub fn Joined(cx: Scope) -> impl IntoView {
             on:click=move |_| {
               set_tab.set(Tab::PredictionMarkets);
             }
-            class={move || format!("my-2 block w-full text-center
+            class={move || format!("my-2 block w-full text-center text-nowrap
             border-b-2 
             py-4
             ease

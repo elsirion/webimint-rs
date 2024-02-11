@@ -77,32 +77,27 @@ pub fn SetNameToPayoutControl(
     });
 
     view! { cx,
-        <div class="border-[1px] p-2">
-            <p class="border-b text-lg">"Assign Name to Payout Control"</p>
-            <div>
-                <label>"Name"</label>
-                <br />
-                <input
-                    on:input=move |ev| form_name.set(event_target_value(&ev))
-                    prop:value=move || form_name.get()
-                />
-                <br />
+        <div class="flex flex-col gap-1 border-[1px] p-2">
+            <h2 class="border-b text-lg">"Assign Name to Payout Control"</h2>
 
-                <label>"Payout Control"</label>
-                <br />
-                <input
-                    on:input=move |ev| form_payout_control.set(event_target_value(&ev))
-                    prop:value=move || form_payout_control.get()
-                />
-                <br />
+            <label>"Name"</label>
+            <input
+                on:input=move |ev| form_name.set(event_target_value(&ev))
+                prop:value=move || form_name.get()
+            />
 
-                <button
-                    class="border-[1px] hover:bg-slate-200"
-                    on:click=move |_| set_name_to_payout_control_action.dispatch(())
-                >
-                    "Save"
-                </button>
-            </div>
+            <label>"Payout Control"</label>
+            <input
+                on:input=move |ev| form_payout_control.set(event_target_value(&ev))
+                prop:value=move || form_payout_control.get()
+            />
+
+            <button
+                class="border-[1px] p-2 hover:bg-slate-200"
+                on:click=move |_| set_name_to_payout_control_action.dispatch(())
+            >
+                "Save"
+            </button>
         </div>
     }
 }
@@ -137,6 +132,19 @@ pub fn NameToPayoutControlTable(
         }
     });
 
+    let sorted_by_name = create_memo(cx, move |_| {
+        let mut v = vec![];
+        let Some(Ok(m)) = name_to_payout_control_map_resource.read(cx) else {
+            return v;
+        };
+        for kv in m {
+            v.push(kv)
+        }
+        v.sort_by(|(name1, _), (name2, _)| name1.cmp(name2));
+
+        v
+    });
+
     view! {cx,
         <Show
             when=move || matches!{name_to_payout_control_map_resource.read(cx), Some(Ok(_))}
@@ -149,18 +157,16 @@ pub fn NameToPayoutControlTable(
                     <th class="border-[1px] p-2">"Payout Control"</th>
                 </thead>
                 {move || {
-                    name_to_payout_control_map_resource
-                        .read(cx)
-                        .unwrap()
-                        .unwrap()
+                    sorted_by_name
+                        .get()
                         .into_iter()
                         .map(|(name, public_key)| {
                             let action_name = name.to_owned();
                             view! {
                                 cx,
                                 <tr>
-                                    <td 
-                                        class="border-[1px] p-2 cursor-pointer"
+                                    <td
+                                        class="border-[1px] p-2 text-center cursor-pointer hover:bg-red-500"
                                         on:click=move |_| set_name_to_none_action.dispatch(action_name.to_owned())
                                     >
                                         "X"

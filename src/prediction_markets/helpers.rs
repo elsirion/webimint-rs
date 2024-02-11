@@ -1,5 +1,4 @@
 use fedimint_prediction_markets_common::{Seconds, UnixTimestamp};
-use tracing::info;
 
 pub fn unix_timestamp_to_js_string(t: UnixTimestamp) -> String {
     let unix_milli =
