@@ -1,19 +1,25 @@
-use anyhow;
-use fedimint_client::secret::PlainRootSecretStrategy;
-use fedimint_client::sm::OperationId;
-use fedimint_client::Client;
+use crate::db::PersistentMemDb;
+use fedimint_client::secret::{PlainRootSecretStrategy, RootSecretStrategy};
+use fedimint_client::{Client, FederationInfo};
 use fedimint_core::api::InviteCode;
-use fedimint_core::db::mem_impl::MemDatabase;
+use fedimint_core::core::OperationId;
+use fedimint_core::db::IDatabaseTransactionOpsCore;
+use fedimint_core::db::IRawDatabase;
 use fedimint_core::task::spawn;
 use fedimint_core::util::BoxStream;
 use fedimint_core::Amount;
-use fedimint_ln_client::{LightningClientExt, LightningClientGen, LightningMeta};
-use fedimint_mint_client::{MintClientExt, OOBNotes};
-use fedimint_mint_client::{MintClientGen, MintMeta, MintMetaVariants};
-use fedimint_wallet_client::WalletClientGen;
+use fedimint_ln_client::{
+    LightningClientInit, LightningClientModule, LightningOperationMeta, LightningOperationMetaPay,
+    LightningOperationMetaVariant,
+};
+use fedimint_mint_client::{
+    MintClientInit, MintClientModule, MintOperationMeta, MintOperationMetaVariant, OOBNotes,
+};
+use fedimint_wallet_client::WalletClientInit;
 use futures::StreamExt;
 use leptos::logging::warn;
-use lightning_invoice::{Invoice, InvoiceDescription};
+use lightning_invoice::{Bolt11Invoice, Bolt11InvoiceDescription};
+use rand::thread_rng;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
 use std::str::FromStr;
@@ -24,6 +30,8 @@ use tracing::{debug, info};
 
 #[derive(Debug, Clone)]
 enum RpcRequest {
+    ListWallets,
+    SelectWallet(String),
     Join(String),
     GetName,
     SubscribeBalance,
@@ -35,6 +43,10 @@ enum RpcRequest {
 }
 
 enum RpcResponse {
+    ListWallets(Vec<String>),
+    SelectWallet {
+        initialized: bool,
+    },
     Join,
     GetName(String),
     SubscribeBalance(BoxStream<'static, Amount>),
@@ -80,11 +92,18 @@ impl From<anyhow::Error> for RpcError {
 type RpcCall = (RpcRequest, oneshot::Sender<anyhow::Result<RpcResponse>>);
 
 async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
-    let client = loop {
-        let (invite_code_str, response_sender) = match rpc.recv().await.expect("Sender not dropped")
+    // Open DB
+    let (wallet_db, joined) = loop {
+        let (wallet_db_name, response_sender) = match rpc.recv().await.expect("Sender not dropped")
         {
-            (RpcRequest::Join(invite_code_str), response_sender) => {
-                (invite_code_str, response_sender)
+            (RpcRequest::SelectWallet(wallet_db_name), response_sender) => {
+                (wallet_db_name, response_sender)
+            }
+            (RpcRequest::ListWallets, response_sender) => {
+                let _ = response_sender
+                    .send(Ok(RpcResponse::ListWallets(PersistentMemDb::list_dbs())))
+                    .map_err(|_| warn!("RPC receiver dropped before response was sent"));
+                continue;
             }
             (_, response_sender) => {
                 let _ = response_sender
@@ -96,41 +115,125 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
             }
         };
 
-        info!("Joining federation {}", invite_code_str);
-
-        let invite_code = match InviteCode::from_str(&invite_code_str) {
-            Ok(invite) => invite,
-            Err(e) => {
-                let _ = response_sender
-                    .send(Err(anyhow::anyhow!("Invalid invite code: {e:?}")))
-                    .map_err(|_| warn!("RPC receiver dropped before response was sent"));
-                continue;
-            }
+        info!("Opening Wallet DB {}", wallet_db_name);
+        let wallet_db = PersistentMemDb::new(wallet_db_name).await;
+        let joined = {
+            let mut dbtx = wallet_db.begin_transaction().await;
+            let mut stream = dbtx.raw_find_by_prefix(&[0x2f]).await.expect("DB error");
+            stream.next().await.is_some()
         };
 
+        let _ = response_sender
+            .send(Ok(RpcResponse::SelectWallet {
+                initialized: joined,
+            }))
+            .map_err(|_| warn!("RPC receiver dropped before response was sent"));
+
+        break (wallet_db, joined);
+    };
+
+    let client = if !joined {
+        loop {
+            let (invite_code_str, response_sender) =
+                match rpc.recv().await.expect("Sender not dropped") {
+                    (RpcRequest::Join(invite_code_str), response_sender) => {
+                        (invite_code_str, response_sender)
+                    }
+                    (_, response_sender) => {
+                        let _ = response_sender
+                            .send(Err(anyhow::anyhow!(
+                                "Invalid request, need to initialize client first"
+                            )))
+                            .map_err(|_| warn!("RPC receiver dropped before response was sent"));
+                        continue;
+                    }
+                };
+
+            info!("Joining federation {}", invite_code_str);
+
+            let invite_code = match InviteCode::from_str(&invite_code_str) {
+                Ok(invite) => invite,
+                Err(e) => {
+                    let _ = response_sender
+                        .send(Err(anyhow::anyhow!("Invalid invite code: {e:?}")))
+                        .map_err(|_| warn!("RPC receiver dropped before response was sent"));
+                    continue;
+                }
+            };
+
+            let mut client_builder = fedimint_client::Client::builder();
+            client_builder.with_database(wallet_db.clone().into());
+
+            let client_secret = match client_builder
+                .load_decodable_client_secret::<[u8; 64]>()
+                .await
+            {
+                Ok(secret) => secret,
+                Err(_) => {
+                    info!("Generating secret and writing to client storage");
+                    let secret = PlainRootSecretStrategy::random(&mut thread_rng());
+                    client_builder
+                        .store_encodable_client_secret(secret)
+                        .await
+                        .expect("Failed to store client secret");
+                    secret
+                }
+            };
+
+            client_builder.with_module(WalletClientInit(None));
+            client_builder.with_module(MintClientInit);
+            client_builder.with_module(LightningClientInit);
+            client_builder.with_primary_module(1);
+            client_builder
+                .with_federation_info(FederationInfo::from_invite_code(invite_code).await.unwrap());
+            let client_res = client_builder
+                .build(PlainRootSecretStrategy::to_root_secret(&client_secret))
+                .await;
+
+            match client_res {
+                Ok(client) => {
+                    let _ = response_sender
+                        .send(Ok(RpcResponse::Join))
+                        .map_err(|_| warn!("RPC receiver dropped before response was sent"));
+                    break client;
+                }
+                Err(e) => {
+                    let _ = response_sender
+                        .send(Err(anyhow::anyhow!("Failed to initialize client: {e:?}")))
+                        .map_err(|_| warn!("RPC receiver dropped before response was sent"));
+                    continue;
+                }
+            };
+        }
+    } else {
+        // TODO: dedup
         let mut client_builder = fedimint_client::Client::builder();
-        client_builder.with_module(WalletClientGen(None));
-        client_builder.with_module(MintClientGen);
-        client_builder.with_module(LightningClientGen);
-        client_builder.with_database(MemDatabase::new());
-        client_builder.with_primary_module(1);
-        client_builder.with_invite_code(invite_code);
-        let client_res = client_builder.build::<PlainRootSecretStrategy>().await;
+        client_builder.with_database(wallet_db.into());
 
-        match client_res {
-            Ok(client) => {
-                let _ = response_sender
-                    .send(Ok(RpcResponse::Join))
-                    .map_err(|_| warn!("RPC receiver dropped before response was sent"));
-                break client;
-            }
-            Err(e) => {
-                let _ = response_sender
-                    .send(Err(anyhow::anyhow!("Failed to initialize client: {e:?}")))
-                    .map_err(|_| warn!("RPC receiver dropped before response was sent"));
-                continue;
+        let client_secret = match client_builder
+            .load_decodable_client_secret::<[u8; 64]>()
+            .await
+        {
+            Ok(secret) => secret,
+            Err(_) => {
+                info!("Generating secret and writing to client storage");
+                let secret = PlainRootSecretStrategy::random(&mut thread_rng());
+                client_builder
+                    .store_encodable_client_secret(secret)
+                    .await
+                    .expect("Failed to store client secret");
+                secret
             }
         };
+
+        client_builder.with_module(WalletClientInit(None));
+        client_builder.with_module(MintClientInit);
+        client_builder.with_module(LightningClientInit);
+        client_builder.with_primary_module(1);
+        client_builder
+            .build(PlainRootSecretStrategy::to_root_secret(&client_secret))
+            .await
+            .unwrap()
     };
 
     let client: &Client = Box::leak(Box::new(client));
@@ -161,7 +264,10 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
                     info!("Receiving notes: \"{notes}\"");
                     let notes: OOBNotes = notes.parse()?;
                     let amount = notes.total_amount();
-                    client.reissue_external_notes(notes, ()).await?;
+                    client
+                        .get_first_module::<MintClientModule>()
+                        .reissue_external_notes(notes, ())
+                        .await?;
                     Ok(RpcResponse::Receive(amount))
                 }
                 let _ = response_sender
@@ -169,7 +275,7 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
                     .map_err(|_| warn!("RPC receiver dropped before response was sent"));
             }
             RpcRequest::LnSend(invoice) => {
-                let invoice = match Invoice::from_str(&invoice) {
+                let invoice = match Bolt11Invoice::from_str(&invoice) {
                     Ok(invoice) => invoice,
                     Err(e) => {
                         let _ = response_sender
@@ -182,7 +288,8 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
                 let _ = response_sender
                     .send(
                         client
-                            .pay_bolt11_invoice(invoice)
+                            .get_first_module::<LightningClientModule>()
+                            .pay_bolt11_invoice(invoice, ())
                             .await
                             .map(|_| RpcResponse::LnSend),
                     )
@@ -193,7 +300,8 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
                 description,
             } => {
                 let (operation_id, invoice) = match client
-                    .create_bolt11_invoice(amount, description, None)
+                    .get_first_module::<LightningClientModule>()
+                    .create_bolt11_invoice(amount, description, None, ())
                     .await
                 {
                     Ok(res) => res,
@@ -207,11 +315,12 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
 
                 let (await_paid_sender, await_paid_receiver) = watch::channel(false);
                 let mut subscription = client
+                    .get_first_module::<LightningClientModule>()
                     .subscribe_ln_receive(operation_id)
                     .await
                     .expect("subscribing to a just created operation can't fail")
                     .into_stream();
-                spawn(async move {
+                spawn("waiting for invoice being paid", async move {
                     while let Some(state) = subscription.next().await {
                         if state == fedimint_ln_client::LnReceiveState::Funded {
                             let _ = await_paid_sender.send(true);
@@ -233,44 +342,47 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
                     .await
                     .into_iter()
                     .map(|(key, op_log)| {
-                        let (amount_msat, description) = match op_log.operation_type() {
+                        let (amount_msat, description) = match op_log.operation_module_kind() {
                             "mint" => {
-                                let meta = op_log.meta::<MintMeta>();
+                                let meta = op_log.meta::<MintOperationMeta>();
                                 match meta.variant {
-                                    MintMetaVariants::Reissuance { .. } => {
+                                    MintOperationMetaVariant::Reissuance { .. } => {
                                         (meta.amount.msats as i64, None)
                                     }
-                                    MintMetaVariants::SpendOOB { .. } => {
+                                    MintOperationMetaVariant::SpendOOB { .. } => {
                                         (-(meta.amount.msats as i64), None)
                                     }
                                 }
                             }
-                            "ln" => match op_log.meta::<LightningMeta>() {
-                                LightningMeta::Receive { invoice, .. } => {
+                            "ln" => match op_log.meta::<LightningOperationMeta>().variant {
+                                LightningOperationMetaVariant::Receive { invoice, .. } => {
                                     let amount = invoice
                                         .amount_milli_satoshis()
                                         .expect("We don't create 0 amount invoices")
                                         as i64;
                                     let description = match invoice.description() {
-                                        InvoiceDescription::Direct(description) => {
+                                        Bolt11InvoiceDescription::Direct(description) => {
                                             Some(description.to_string())
                                         }
-                                        InvoiceDescription::Hash(_) => None,
+                                        Bolt11InvoiceDescription::Hash(_) => None,
                                     };
 
                                     (amount, description)
                                 }
-                                LightningMeta::Pay { invoice, .. } => {
+                                LightningOperationMetaVariant::Pay(LightningOperationMetaPay {
+                                    invoice,
+                                    ..
+                                }) => {
                                     // TODO: add fee
                                     let amount = -(invoice
                                         .amount_milli_satoshis()
                                         .expect("Can't pay 0 amount invoices")
                                         as i64);
                                     let description = match invoice.description() {
-                                        InvoiceDescription::Direct(description) => {
+                                        Bolt11InvoiceDescription::Direct(description) => {
                                             Some(description.to_string())
                                         }
-                                        InvoiceDescription::Hash(_) => None,
+                                        Bolt11InvoiceDescription::Hash(_) => None,
                                     };
 
                                     (amount, description)
@@ -282,7 +394,7 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
                         Transaction {
                             timestamp: key.creation_time,
                             operation_id: key.operation_id,
-                            operation_kind: op_log.operation_type().to_owned(),
+                            operation_kind: op_log.operation_module_kind().to_owned(),
                             amount_msat,
                             description,
                         }
@@ -415,6 +527,33 @@ impl ClientRpc {
         let response = response_receiver.await.expect("Client has stopped")?;
         match response {
             RpcResponse::ListTransactions(transactions) => Ok(transactions),
+            _ => Err(RpcError::InvalidResponse),
+        }
+    }
+
+    pub async fn list_wallets(&self) -> Result<Vec<String>, RpcError> {
+        let (response_sender, response_receiver) = oneshot::channel();
+        self.sender
+            .send((RpcRequest::ListWallets, response_sender))
+            .await
+            .expect("Client has stopped");
+        let response = response_receiver.await.expect("Client has stopped")?;
+        match response {
+            RpcResponse::ListWallets(wallets) => Ok(wallets),
+            _ => Err(RpcError::InvalidResponse),
+        }
+    }
+
+    /// Opens a wallet and returns whether it is initialized already. If false is returned an invite code has to be provided.
+    pub async fn select_wallet(&self, name: String) -> Result<bool, RpcError> {
+        let (response_sender, response_receiver) = oneshot::channel();
+        self.sender
+            .send((RpcRequest::SelectWallet(name), response_sender))
+            .await
+            .expect("Client has stopped");
+        let response = response_receiver.await.expect("Client has stopped")?;
+        match response {
+            RpcResponse::SelectWallet { initialized } => Ok(initialized),
             _ => Err(RpcError::InvalidResponse),
         }
     }

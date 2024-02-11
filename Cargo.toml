@@ -12,18 +12,17 @@ opt-level = 'z'
 async-trait = "0.1.68"
 anyhow = "1.0.71"
 base64 = "0.21.3"
-fedimint-client = { git = "https://github.com/fedimint/fedimint", tag = "v0.1.1" }
-fedimint-core = { git = "https://github.com/fedimint/fedimint", tag = "v0.1.1" }
-fedimint-wallet-client = { git = "https://github.com/fedimint/fedimint", tag = "v0.1.1" }
-fedimint-mint-client = { git = "https://github.com/fedimint/fedimint", tag = "v0.1.1" }
-fedimint-ln-client = { git = "https://github.com/fedimint/fedimint", tag = "v0.1.1" }
+fedimint-client = "0.2.1-rc1"
+fedimint-core = "0.2.1-rc1"
+fedimint-wallet-client = "0.2.1-rc1"
+fedimint-mint-client = "0.2.1-rc1"
+fedimint-ln-client = "0.2.1-rc1"
 futures = "0.3.28"
 hex = "0.4.3"
-leptos = { version = "0.5.1", features = ["csr"] }
-leptos-qr-scanner = { git = "https://github.com/elsirion/leptos-qr-scanner", rev = "75e976e99d9c1ed64921081a23f7da823d2a0b6d" }
-leptos_icons = { version = "0.0.15", features = ["macros", "BsLightningCharge", "FaCoinsSolid"] }
-leptos_meta = { version = "0.5.1", features = ["csr"] }
-lightning-invoice = { version = "0.21.0", features = [ "serde" ] }
+leptos = { version = "0.6.5", features = ["csr"] }
+leptos-qr-scanner = { git = "https://github.com/elsirion/leptos-qr-scanner", rev = "5830bd6f75d7836189ef1434f71a10222a737a44" }
+leptos_meta = { version = "0.6.5", features = ["csr"] }
+lightning-invoice = { version = "0.26.0", features = [ "serde" ] }
 qrcode-generator = "4.1.8"
 
 console_error_panic_hook = "0.1.7"
@@ -38,9 +37,9 @@ tokio = { version = "1.28.2", features = [ "rt", "sync", "time" ] }
 tokio-stream = "0.1.14"
 wasm-bindgen = "0.2.87"
 wasm-bindgen-futures = "0.4.37"
+web-sys = { version = "0.3.65", features = [ "Navigator", "Window", "ServiceWorkerContainer" ] }
+gloo-storage = "0.3.0"
+rand = "0.8.5"
 
-rexie = "0.4.2"
-
-[patch.crates-io]
-secp256k1-zkp = { git = "https://github.com/dpc/rust-secp256k1-zkp/", branch = "sanket-pr" }
-ring = { git = "https://github.com/dpc/ring", rev = "5493e7e76d0d8fb1d3cbb0be9c4944700741b802" }
+[build-dependencies]
+fedimint-build = "0.2.1-rc1"

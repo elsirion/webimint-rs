@@ -1,235 +1,132 @@
-use anyhow::{anyhow, Result};
-use fedimint_core::db::{
-    IDatabase, IDatabaseTransaction, ISingleUseDatabaseTransaction, PrefixStream,
-};
-use fedimint_core::db::{IDatabaseTransactionOps, SingleUseDatabaseTransaction};
+use anyhow::Result;
+use fedimint_core::db::mem_impl::{MemDatabase, MemTransaction};
+use fedimint_core::db::{IDatabaseTransactionOps, IDatabaseTransactionOpsCore, IRawDatabase, IRawDatabaseTransaction};
+use fedimint_core::db::{PrefixStream};
+use fedimint_core::module::__reexports::serde_json;
 use fedimint_core::{apply, async_trait_maybe_send};
-use rexie::{Direction, KeyRange, TransactionMode};
-use std::fmt::{Debug, Formatter};
-use std::marker::PhantomData;
-use tracing::{debug, info};
+use std::collections::BTreeMap;
+use std::fmt::Debug;
+use std::sync::Arc;
+use tracing::info;
 
 use futures::StreamExt;
-use wasm_bindgen::JsValue;
+use gloo_storage::Storage;
 
-const STORE_NAME: &str = "fedimint";
+#[derive(Clone, Debug)]
+pub struct PersistentMemDb(Arc<MemDatabase>, String);
 
-pub struct WasmDatabase(rexie::Rexie);
+impl PersistentMemDb {
+    pub async fn new(name: String) -> PersistentMemDb {
+        let init_data: Vec<(Vec<u8>, Vec<u8>)> = match gloo_storage::LocalStorage::get(&name) {
+            Ok(data) => data,
+            Err(gloo_storage::errors::StorageError::KeyNotFound(_)) => Vec::new(),
+            Err(e) => panic!("Error loading DB: {e}"),
+        };
 
-#[apply(async_trait_maybe_send!)]
-impl IDatabase for WasmDatabase {
-    async fn begin_transaction<'a>(&'a self) -> Box<dyn ISingleUseDatabaseTransaction<'a>> {
-        let wasm_db_tx = WasmDatabaseTransaction(
-            Some(
-                self.0
-                    .transaction(&[STORE_NAME], TransactionMode::Cleanup)
-                    .expect("Could not start IndexedDB transaction"),
-            ),
-            PhantomData,
-        );
-        Box::new(SingleUseDatabaseTransaction::new(wasm_db_tx))
+        let db = MemDatabase::new();
+        {
+            let mut dbtx = db.begin_transaction().await;
+
+            for (key, value) in init_data {
+                dbtx.raw_insert_bytes(&key, &value)
+                    .await
+                    .expect("inset failed");
+            }
+
+            dbtx.commit_tx()
+                .await
+                .expect("No dbtx running in parallel, can't fail");
+        }
+
+        PersistentMemDb(Arc::new(db), name)
     }
-}
 
-impl Debug for WasmDatabase {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "WasmDatabase")
-    }
-}
-
-pub struct WasmDatabaseTransaction<'a>(Option<rexie::Transaction>, PhantomData<&'a ()>);
-
-#[apply(async_trait_maybe_send!)]
-impl<'a> IDatabaseTransaction<'a> for WasmDatabaseTransaction<'a> {
-    async fn commit_tx(mut self) -> anyhow::Result<()> {
-        self.0
-            .take()
-            .ok_or(anyhow!("Transaction already committed"))?
-            .commit()
-            .await
-            .map_err(|e| anyhow!("Could not commit IndexedDB transaction: {e:?}"))?;
-        Ok(())
+    pub fn list_dbs() -> Vec<String> {
+        gloo_storage::LocalStorage::get_all::<BTreeMap<String, serde_json::Value>>()
+            .unwrap()
+            .into_keys()
+            .collect()
     }
 }
 
 #[apply(async_trait_maybe_send!)]
-impl<'a> IDatabaseTransactionOps<'a> for WasmDatabaseTransaction<'a> {
+impl IRawDatabase for PersistentMemDb {
+    type Transaction<'a> = PersistentMemDbTransaction<'a>;
+
+    async fn begin_transaction<'a>(&'a self) -> PersistentMemDbTransaction<'a> {
+        PersistentMemDbTransaction(
+            self.0.begin_transaction().await,
+            self.1.clone(),
+        )
+    }
+}
+
+pub struct PersistentMemDbTransaction<'a>(MemTransaction<'a>, String);
+
+#[apply(async_trait_maybe_send!)]
+impl<'a> IDatabaseTransactionOpsCore for PersistentMemDbTransaction<'a> {
     async fn raw_insert_bytes(
         &mut self,
         key: &[u8],
         value: &[u8],
     ) -> anyhow::Result<Option<Vec<u8>>> {
-        let old_value = self.raw_get_bytes(key).await?;
-
-        let key = bytes_to_value(key);
-        let value = bytes_to_value(value);
-        self.0
-            .as_ref()
-            .ok_or(anyhow!("Transaction already committed"))?
-            .store(STORE_NAME)
-            .expect("Stroe exists")
-            .put(&key, Some(&value))
-            .await
-            .map_err(|e| anyhow!("Could not insert entry into IndexedDB: {e:?}"))?;
-        Ok(old_value)
+        self.0.raw_insert_bytes(key, value).await
     }
 
     async fn raw_get_bytes(&mut self, key: &[u8]) -> anyhow::Result<Option<Vec<u8>>> {
-        let key = JsValue::from(hex::encode(key));
-        let value = self
-            .0
-            .as_ref()
-            .ok_or(anyhow!("Transaction already committed"))?
-            .store(STORE_NAME)
-            .expect("Store exists")
-            .get(&key)
-            .await
-            .map_err(|e| anyhow!("Could fetch entry from IndexedDB: {e:?}"))?;
-        if value.is_undefined() {
-            Ok(None)
-        } else {
-            Ok(Some(
-                hex::decode(value.as_string().expect("Value is a string"))
-                    .map_err(|e| anyhow!("Failed to decode value from IndexedDB: {:?}", e))?,
-            ))
-        }
+        self.0.raw_get_bytes(key).await
     }
 
     async fn raw_remove_entry(&mut self, key: &[u8]) -> anyhow::Result<Option<Vec<u8>>> {
-        let old_value = self.raw_get_bytes(key).await?;
-
-        let key = bytes_to_value(key);
-        self.0
-            .as_ref()
-            .ok_or(anyhow!("Transaction already committed"))?
-            .store(STORE_NAME)
-            .expect("Store exists")
-            .delete(&key)
-            .await
-            .map_err(|e| anyhow!("Could delete entry from IndexedDB: {e:?}"))?;
-        Ok(old_value)
+        self.0.raw_remove_entry(key).await
     }
 
     async fn raw_find_by_prefix(&mut self, key_prefix: &[u8]) -> anyhow::Result<PrefixStream<'_>> {
-        // TODO: stream by limiting and using multiple queries
-        let iter = fetch_prefix_items(
-            self.0
-                .as_ref()
-                .ok_or(anyhow!("Transaction already committed"))?,
-            key_prefix,
-        )
-        .await?;
-        Ok(Box::pin(futures::stream::iter(iter)))
+        self.0.raw_find_by_prefix(key_prefix).await
     }
 
     async fn raw_find_by_prefix_sorted_descending(
         &mut self,
         key_prefix: &[u8],
     ) -> anyhow::Result<PrefixStream<'_>> {
-        let iter = fetch_prefix_items(
-            self.0
-                .as_ref()
-                .ok_or(anyhow!("Transaction already committed"))?,
-            key_prefix,
-        )
-        .await?
-        .rev();
-        Ok(Box::pin(futures::stream::iter(iter)))
+        self.0
+            .raw_find_by_prefix_sorted_descending(key_prefix)
+            .await
     }
 
     async fn raw_remove_by_prefix(&mut self, key_prefix: &[u8]) -> Result<()> {
-        let keys = self
-            .raw_find_by_prefix(key_prefix)
-            .await?
-            .map(|kv| kv.0)
-            .collect::<Vec<_>>()
-            .await;
-        for key in keys {
-            self.raw_remove_entry(key.as_slice()).await?;
-        }
-        Ok(())
+        self.0.raw_remove_by_prefix(key_prefix).await
+    }
+}
+
+#[apply(async_trait_maybe_send!)]
+impl<'a> IDatabaseTransactionOps for PersistentMemDbTransaction<'a> {
+    async fn set_tx_savepoint(&mut self) -> anyhow::Result<()> {
+        self.0.set_tx_savepoint().await
     }
 
     async fn rollback_tx_to_savepoint(&mut self) -> anyhow::Result<()> {
-        unimplemented!("Savepoints are not supported in IndexedDB")
-    }
-
-    async fn set_tx_savepoint(&mut self) -> anyhow::Result<()> {
-        unimplemented!("Savepoints are not supported in IndexedDB")
+        self.0.rollback_tx_to_savepoint().await
     }
 }
 
-impl<'a> Drop for WasmDatabaseTransaction<'a> {
-    fn drop(&mut self) {
-        if let Some(dbtx) = self.0.take() {
-            info!("Aborting dbtx via Drop");
-            wasm_bindgen_futures::spawn_local(async move {
-                dbtx.abort().await.expect("Aborting DB transaction failed")
-            });
-        } else {
-            debug!("Dropping already committed dbtx");
-        }
+#[apply(async_trait_maybe_send!)]
+impl<'a> IRawDatabaseTransaction for PersistentMemDbTransaction<'a> {
+    async fn commit_tx(mut self) -> Result<()> {
+        let dump = self
+            .0
+            .raw_find_by_prefix(&[])
+            .await
+            .expect("Dumping DB failed")
+            .collect::<Vec<(Vec<u8>, Vec<u8>)>>()
+            .await;
+        self.0.commit_tx().await?;
+
+        info!("Writing DB dump of {} kv pairs", dump.len());
+
+        // FIXME: more compact format
+        gloo_storage::LocalStorage::set(&self.1, dump).expect("Could not store DB");
+
+        Ok(())
     }
-}
-
-// When finding by prefix iterating in Reverse order, we need to start from
-// "prefix+1" instead of "prefix", using lexicographic ordering. See the tests
-// below.
-// Will return None if there is no next prefix (i.e prefix is already the last
-// possible/max one)
-fn next_prefix(prefix: &[u8]) -> Option<Vec<u8>> {
-    let mut next_prefix = prefix.to_vec();
-    let mut is_last_prefix = true;
-    for i in (0..next_prefix.len()).rev() {
-        next_prefix[i] = next_prefix[i].wrapping_add(1);
-        if next_prefix[i] > 0 {
-            is_last_prefix = false;
-            break;
-        }
-    }
-    if is_last_prefix {
-        // The given prefix is already the last/max prefix, so there is no next prefix,
-        // return None to represent that
-        None
-    } else {
-        Some(next_prefix)
-    }
-}
-
-fn value_to_bytes(value: JsValue) -> Option<Vec<u8>> {
-    if value.is_undefined() {
-        None
-    } else {
-        Some(
-            hex::decode(value.as_string().expect("Value is a string"))
-                .expect("Value is a valid hex string"),
-        )
-    }
-}
-
-fn bytes_to_value(bytes: &[u8]) -> JsValue {
-    JsValue::from(hex::encode(bytes))
-}
-
-async fn fetch_prefix_items(
-    dbtx: &rexie::Transaction,
-    key_prefix: &[u8],
-) -> anyhow::Result<impl DoubleEndedIterator<Item = (Vec<u8>, Vec<u8>)>> {
-    let first_key = bytes_to_value(key_prefix);
-    let last_key = bytes_to_value(&next_prefix(key_prefix).unwrap_or(vec![]));
-
-    let range = KeyRange::bound(&first_key, &last_key, false, true).expect("KeyRange is valid");
-    let items = dbtx
-        .store(STORE_NAME)
-        .expect("Store exists")
-        .get_all(Some(&range), None, None, Some(Direction::Next))
-        .await
-        .map_err(|e| anyhow!("Could not fetch items from IndexedDB: {e:?}"))?;
-
-    Ok(items.into_iter().map(|(key, value)| {
-        (
-            value_to_bytes(key).expect("Entry exists"),
-            value_to_bytes(value).expect("Entry exists"),
-        )
-    }))
 }

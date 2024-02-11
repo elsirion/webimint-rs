@@ -1,6 +1,5 @@
 use crate::client::Transaction;
 use leptos::*;
-use leptos_icons::*;
 
 use crate::components::LoaderIcon;
 use crate::context::ClientContext;
@@ -11,7 +10,7 @@ use crate::context::ClientContext;
 #[component]
 pub fn TxList<F>(update_signal: F) -> impl IntoView
 where
-    F: Fn() -> () + Copy + 'static,
+    F: Fn() + Copy + 'static,
 {
     let ClientContext { client, .. } = expect_context::<ClientContext>();
 
@@ -57,8 +56,11 @@ pub fn TxListRow(transaction: Transaction) -> impl IntoView {
             <td class="text-center p-4">
                 {
                     match transaction.operation_kind.as_ref() {
-                        "ln" => view! {<Icon icon=icon!(BsLightningCharge) width="2em" height="2em"/>},
-                        "mint" => view! {<Icon icon=icon!(FaCoinsSolid) width="2em" height="2em"/>},
+                      // FIXME: Create icon components or use svg
+                        // "ln" => view! {<Icon icon=icon!(BsLightningCharge) width="2em" height="2em"/>},
+                        // "mint" => view! {<Icon icon=icon!(FaCoinsSolid) width="2em" height="2em"/>},
+                        "ln" => view! {"+ln+"},
+                        "mint" => view! {"+m+"},
                         other => {
                             let kind = other.to_owned();
                             view! {<span>{kind}</span>}.into_view()
