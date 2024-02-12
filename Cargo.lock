@@ -852,41 +852,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fedimint-leptos-test"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "base64 0.21.3",
- "console_error_panic_hook",
- "fedimint-build",
- "fedimint-client",
- "fedimint-core",
- "fedimint-ln-client",
- "fedimint-mint-client",
- "fedimint-wallet-client",
- "futures",
- "gloo-storage",
- "hex",
- "leptos",
- "leptos-qr-scanner",
- "leptos_icons",
- "leptos_meta",
- "lightning-invoice",
- "qrcode-generator",
- "rand",
- "serde",
- "thiserror",
- "tokio",
- "tokio-stream",
- "tracing",
- "tracing-wasm",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
-]
-
-[[package]]
 name = "fedimint-ln-client"
 version = "0.2.1-rc1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3752,6 +3717,41 @@ checksum = "5db499c5f66323272151db0e666cd34f78617522fb0c1604d31a27c50c206a85"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "webimint"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "base64 0.21.3",
+ "console_error_panic_hook",
+ "fedimint-build",
+ "fedimint-client",
+ "fedimint-core",
+ "fedimint-ln-client",
+ "fedimint-mint-client",
+ "fedimint-wallet-client",
+ "futures",
+ "gloo-storage",
+ "hex",
+ "leptos",
+ "leptos-qr-scanner",
+ "leptos_icons",
+ "leptos_meta",
+ "lightning-invoice",
+ "qrcode-generator",
+ "rand",
+ "serde",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+ "tracing",
+ "tracing-wasm",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
 ]
 
 [[package]]
