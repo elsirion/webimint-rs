@@ -1,5 +1,5 @@
 [package]
-name = "fedimint-leptos-test"
+name = "webimint"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,6 +7,12 @@ edition = "2021"
 
 [profile.release]
 opt-level = 'z'
+
+[profile.ci]
+inherits = "dev"
+incremental = false
+debug = "line-tables-only"
+lto = "off"
 
 [dependencies]
 async-trait = "0.1.68"
