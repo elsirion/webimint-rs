@@ -59,11 +59,11 @@ pub fn TxListRow(transaction: Transaction) -> impl IntoView {
                       // FIXME: Create icon components or use svg
                         // "ln" => view! {<Icon icon=icon!(BsLightningCharge) width="2em" height="2em"/>},
                         // "mint" => view! {<Icon icon=icon!(FaCoinsSolid) width="2em" height="2em"/>},
-                        "ln" => view! {"+ln+"},
-                        "mint" => view! {"+m+"},
+                        "ln" => view! {<span>"+ln+"</span>},
+                        "mint" => view! {<span>"+m+"</span>},
                         other => {
                             let kind = other.to_owned();
-                            view! {<span>{kind}</span>}.into_view()
+                            view! {<span>{kind}</span>}
                         }
                     }
                 }

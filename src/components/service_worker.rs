@@ -1,5 +1,5 @@
 use crate::utils::empty_view;
-use leptos::{component, create_action, window, IntoView, Scope};
+use leptos::{component, create_action, window, IntoView};
 use tracing::{info, warn};
 
 #[component]

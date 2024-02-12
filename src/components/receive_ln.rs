@@ -56,7 +56,7 @@ pub fn ReceiveLn() -> impl IntoView {
                                         return empty_view().into_view();
                                     }
 
-                                    match paid_resource.read() {
+                                    match paid_resource.get() {
                                         Some(()) => view! {
                                             <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 w-full mb-8" role="alert">
                                                 <p class="font-bold">Success</p>

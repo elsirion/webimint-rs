@@ -29,7 +29,7 @@ pub fn Joined() -> impl IntoView {
 
     let federation_label = move || {
         name_resource
-            .read()
+            .get()
             .map(|value| match value {
                 Err(error) => format!("Failed to get federation name {error:?}"),
                 Ok(value) => value,

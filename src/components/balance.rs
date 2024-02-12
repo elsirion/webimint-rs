@@ -1,6 +1,6 @@
 use fedimint_core::Amount;
-use leptos::*;
 use leptos::logging::*;
+use leptos::*;
 
 use crate::context::ClientContext;
 
@@ -24,7 +24,7 @@ pub fn Balance(#[prop(optional, into)] class: String) -> impl IntoView {
             create_signal_from_stream(balance_stream)
         },
     );
-    let balance = move || match balance_resource.read() {
+    let balance = move || match balance_resource.get() {
         None => view! { <p>"Loading..."</p> }.into_view(),
         Some(balance) => {
             let balance_msat = move || balance.get().unwrap_or(Amount::ZERO).msats;
