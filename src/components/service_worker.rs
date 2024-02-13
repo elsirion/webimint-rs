@@ -1,6 +1,7 @@
-use crate::utils::empty_view;
 use leptos::{component, create_action, window, IntoView};
 use tracing::{info, warn};
+
+use crate::utils::empty_view;
 
 #[component]
 pub fn ServiceWorker(#[prop(into)] path: String) -> impl IntoView {

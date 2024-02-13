@@ -1,14 +1,13 @@
-use crate::components::{Footer, Joined, Logo, SubmitForm, WalletSelector};
+use anyhow::anyhow;
+use leptos::{SignalGet, *};
+use leptos_meta::{Link, Meta, Title};
+use tracing::info;
 
 use crate::client::ClientRpc;
 use crate::components::service_worker::ServiceWorker;
+use crate::components::{Footer, Joined, Logo, SubmitForm, WalletSelector};
 use crate::context::provide_client_context;
 use crate::utils::empty_view;
-use anyhow::anyhow;
-use leptos::SignalGet;
-use leptos::*;
-use leptos_meta::{Link, Meta, Title};
-use tracing::info;
 
 //
 // App component

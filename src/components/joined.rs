@@ -1,8 +1,7 @@
 use leptos::*;
 
-use crate::context::ClientContext;
-
 use crate::components::{Balance, Receive, ReceiveLn, Send, TxList};
+use crate::context::ClientContext;
 use crate::utils::empty_view;
 
 #[derive(Clone, PartialEq)]

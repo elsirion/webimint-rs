@@ -1,7 +1,8 @@
-use crate::components::LoaderIcon;
-use crate::utils::empty_view;
 use leptos::ev::MouseEvent;
 use leptos::*;
+
+use crate::components::LoaderIcon;
+use crate::utils::empty_view;
 
 #[component]
 pub fn SubmitButton<F>(
