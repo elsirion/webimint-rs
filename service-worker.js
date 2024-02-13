@@ -1,4 +1,4 @@
-var buildVersion = "f59c3323e20b8fc4"
+var buildVersion = "2f35d1dc56c15ee8"
 var cssBuildVersion = "e155b3cd3af1ec3e"
 var cacheName = "webimint";
 
@@ -6,8 +6,8 @@ var filesToCache = [
     './',
     './index.html',
     './manifest.json',
-    './fedimint-leptos-test-' + buildVersion + '_bg.wasm',
-    './fedimint-leptos-test-' + buildVersion + '.js',
+    './webimint-' + buildVersion + '_bg.wasm',
+    './webimint-' + buildVersion + '.js',
     './index-' + cssBuildVersion + '.css',
     './assets/icons/android-icon-192x192.png',
     './assets/icons/favicon-32x32.png',
