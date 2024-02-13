@@ -6,7 +6,6 @@ mod context;
 mod utils;
 
 use components::App;
-
 use leptos::*;
 
 pub fn main() {

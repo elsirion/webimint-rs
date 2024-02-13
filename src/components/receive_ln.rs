@@ -1,9 +1,10 @@
+use leptos::*;
+
 use crate::components::ln_receive_form::LnReceiveForm;
 use crate::components::loader_icon::LoaderIcon;
 use crate::components::qrcode::QrCode;
 use crate::context::ClientContext;
 use crate::utils::empty_view;
-use leptos::*;
 
 //
 // Receive LN component

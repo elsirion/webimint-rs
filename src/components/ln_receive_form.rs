@@ -1,6 +1,7 @@
+use leptos::*;
+
 use super::submit_button::SubmitButton;
 use crate::utils::empty_view;
-use leptos::*;
 
 #[component]
 pub fn LnReceiveForm<F>(on_submit: F) -> impl IntoView

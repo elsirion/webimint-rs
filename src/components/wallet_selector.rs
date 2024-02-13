@@ -1,5 +1,6 @@
-use super::submit_form::SubmitForm;
 use leptos::*;
+
+use super::submit_form::SubmitForm;
 
 #[component]
 pub fn WalletSelector<F>(available: Vec<String>, on_select: F) -> impl IntoView

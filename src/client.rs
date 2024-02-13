@@ -1,10 +1,12 @@
-use crate::db::PersistentMemDb;
+use std::fmt::{Debug, Formatter};
+use std::str::FromStr;
+use std::time::SystemTime;
+
 use fedimint_client::secret::{PlainRootSecretStrategy, RootSecretStrategy};
 use fedimint_client::{Client, FederationInfo};
 use fedimint_core::api::InviteCode;
 use fedimint_core::core::OperationId;
-use fedimint_core::db::IDatabaseTransactionOpsCore;
-use fedimint_core::db::IRawDatabase;
+use fedimint_core::db::{IDatabaseTransactionOpsCore, IRawDatabase};
 use fedimint_core::task::spawn;
 use fedimint_core::util::BoxStream;
 use fedimint_core::Amount;
@@ -21,12 +23,11 @@ use leptos::logging::warn;
 use lightning_invoice::{Bolt11Invoice, Bolt11InvoiceDescription};
 use rand::thread_rng;
 use serde::{Deserialize, Serialize};
-use std::fmt::{Debug, Formatter};
-use std::str::FromStr;
-use std::time::SystemTime;
 use thiserror::Error as ThisError;
 use tokio::sync::{mpsc, oneshot, watch};
 use tracing::{debug, info};
+
+use crate::db::PersistentMemDb;
 
 #[derive(Debug, Clone)]
 enum RpcRequest {
@@ -544,7 +545,8 @@ impl ClientRpc {
         }
     }
 
-    /// Opens a wallet and returns whether it is initialized already. If false is returned an invite code has to be provided.
+    /// Opens a wallet and returns whether it is initialized already. If false
+    /// is returned an invite code has to be provided.
     pub async fn select_wallet(&self, name: String) -> Result<bool, RpcError> {
         let (response_sender, response_receiver) = oneshot::channel();
         self.sender
