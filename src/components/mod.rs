@@ -10,11 +10,11 @@ pub mod qrcode;
 pub mod receive;
 pub mod receive_ln;
 pub mod send;
+pub mod service_worker;
 pub mod submit_button;
 pub mod submit_form;
 pub mod tx_list;
 pub mod wallet_selector;
-pub mod service_worker;
 
 pub use app::*;
 pub use balance::*;

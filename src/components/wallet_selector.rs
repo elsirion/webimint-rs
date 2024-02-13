@@ -1,12 +1,13 @@
-use super::submit_form::SubmitForm;
 use leptos::*;
 
+use super::submit_form::SubmitForm;
+
 #[component]
-pub fn WalletSelector<F>(cx: Scope, available: Vec<String>, on_select: F) -> impl IntoView
+pub fn WalletSelector<F>(available: Vec<String>, on_select: F) -> impl IntoView
 where
     F: Fn(String) + 'static + Copy,
 {
-    let (loading, set_loading) = create_signal(cx, false);
+    let (loading, set_loading) = create_signal(false);
     let select = move |name: String| {
         set_loading.set(true);
         on_select(name);
@@ -16,7 +17,7 @@ where
         .into_iter()
         .map(|name| {
             let select_name = name.clone();
-            view! { cx,
+            view! {
                 <li>
                   <a
                     class="text-xl underline"
@@ -33,7 +34,7 @@ where
         })
         .collect::<Vec<_>>();
 
-    view! { cx,
+    view! {
         <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-8" role="alert">
           <p class="font-bold">Note</p>
           <p> "To switch wallets after selecting one just reload the web app." </p>

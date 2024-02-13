@@ -1,10 +1,10 @@
 use leptos::*;
 
 #[component]
-pub fn Logo(cx: Scope, #[prop(optional, into)] class: String) -> impl IntoView {
+pub fn Logo(#[prop(optional, into)] class: String) -> impl IntoView {
     // Name needs to be defined! https://discord.com/channels/990354215060795454/1140921151707684984/1140921156149465130
-    view! { cx,
-      <svg class=class width="205" height="30" version="1.1"  viewBox="0 0 54.239583 7.9375" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    view! {
+      <svg class=class width="205" height="30" version="1.1" viewBox="0 0 54.239583 7.9375" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
         <defs>
           <radialGradient id="a" cx="0" cy="0" r="1" gradientTransform="matrix(-8.438 0 0 -8.438 4.0578 4.2355)" gradientUnits="userSpaceOnUse">
           <stop stop-color="#4AD6FF" offset=".50796"/>

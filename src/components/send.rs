@@ -7,15 +7,16 @@ use crate::context::ClientContext;
 // Receive LN component
 //
 #[component]
-pub fn Send(cx: Scope) -> impl IntoView {
-    let ClientContext { client, .. } = expect_context::<ClientContext>(cx);
+pub fn Send() -> impl IntoView {
+    let ClientContext { client, .. } = expect_context::<ClientContext>();
 
-    let submit_action = create_action(cx, move |invoice: &String| {
+    let client = client.clone();
+    let submit_action = create_action(move |invoice: &String| {
         let invoice = invoice.clone();
         async move { client.get_value().ln_send(invoice).await }
     });
 
-    view! { cx,
+    view! {
 
       <SubmitForm
         description="Enter LN invoice (i.e. lnbcrt1p0…) to send a payment".into()
@@ -28,16 +29,16 @@ pub fn Send(cx: Scope) -> impl IntoView {
 
       {move ||
         if let Some(result) = submit_action.value().get() {
-          view!(cx,
+          view!(
             <div class="text-body text-md mt-4">{
               match result {
-                Err(error) => view!(cx, <span class="text-red-500">{format!("✗ Failed to send invoice {error}")}</span>),
-                Ok(_) => view!(cx, <span class="text-green-600">"✓ Invoice successfully sent"</span>)
+                Err(error) => view!(<span class="text-red-500">{format!("✗ Failed to send invoice {error}")}</span>),
+                Ok(_) => view!(<span class="text-green-600">"✓ Invoice successfully sent"</span>)
               }
             }
             </div>)
         } else  {
-          view!(cx, <div></div>)
+          view!(<div></div>)
         }
       }
 

@@ -1,8 +1,7 @@
 use leptos::*;
 
-use crate::context::ClientContext;
-
 use crate::components::{Balance, Receive, ReceiveLn, Send, TxList};
+use crate::context::ClientContext;
 use crate::utils::empty_view;
 
 use crate::prediction_markets::components::PredictionMarketsHome;
@@ -21,19 +20,18 @@ enum Tab {
 // First view whenever an user joined a Federation
 //
 #[component]
-pub fn Joined(cx: Scope) -> impl IntoView {
-    let ClientContext { client, .. } = expect_context::<ClientContext>(cx);
+pub fn Joined() -> impl IntoView {
+    let ClientContext { client, .. } = expect_context::<ClientContext>();
 
     // get name of the federation
     let name_resource = create_resource(
-        cx,
         || (),
         move |_| async move { client.get_value().get_name().await },
     );
 
     let federation_label = move || {
         name_resource
-            .read(cx)
+            .get()
             .map(|value| match value {
                 Err(error) => format!("Failed to get federation name {error:?}"),
                 Ok(value) => value,
@@ -42,9 +40,9 @@ pub fn Joined(cx: Scope) -> impl IntoView {
             .unwrap_or_else(|| "Loading...".into())
     };
 
-    let (tab, set_tab) = create_signal(cx, Tab::Receive);
+    let (tab, set_tab) = create_signal(Tab::Receive);
 
-    view! { cx,
+    view! {
       <h1 class="font-heading text-gray-900 text-4xl font-semibold">{federation_label}</h1>
       <Balance class="my-12" />
       <ul
@@ -129,25 +127,25 @@ pub fn Joined(cx: Scope) -> impl IntoView {
 
       <Show
           when=move || tab.get() == Tab::Send
-          fallback=|_| empty_view()
+          fallback=|| empty_view()
           >
           <Send />
       </Show>
       <Show
           when=move || tab.get() == Tab::Receive
-          fallback=|_| empty_view()
+          fallback=|| empty_view()
           >
           <Receive />
       </Show>
       <Show
           when=move || tab.get() == Tab::ReceiveLn
-          fallback=|_| empty_view()
+          fallback=|| empty_view()
           >
           <ReceiveLn />
       </Show>
       <Show
           when=move || tab.get() == Tab::TxList
-          fallback=|_| empty_view()
+          fallback=|| empty_view()
           >
           <TxList update_signal=move || {tab.get();} />
       </Show>

@@ -1,16 +1,18 @@
-use anyhow::Result;
-use fedimint_core::db::mem_impl::{MemDatabase, MemTransaction};
-use fedimint_core::db::{IDatabaseTransactionOps, IDatabaseTransactionOpsCore, IRawDatabase, IRawDatabaseTransaction};
-use fedimint_core::db::PrefixStream;
-use fedimint_core::module::__reexports::serde_json;
-use fedimint_core::{apply, async_trait_maybe_send};
 use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::sync::Arc;
-use tracing::info;
 
+use anyhow::Result;
+use fedimint_core::db::mem_impl::{MemDatabase, MemTransaction};
+use fedimint_core::db::{
+    IDatabaseTransactionOps, IDatabaseTransactionOpsCore, IRawDatabase, IRawDatabaseTransaction,
+    PrefixStream,
+};
+use fedimint_core::module::__reexports::serde_json;
+use fedimint_core::{apply, async_trait_maybe_send};
 use futures::StreamExt;
 use gloo_storage::Storage;
+use tracing::info;
 
 #[derive(Clone, Debug)]
 pub struct PersistentMemDb(Arc<MemDatabase>, String);
@@ -54,10 +56,7 @@ impl IRawDatabase for PersistentMemDb {
     type Transaction<'a> = PersistentMemDbTransaction<'a>;
 
     async fn begin_transaction<'a>(&'a self) -> PersistentMemDbTransaction<'a> {
-        PersistentMemDbTransaction(
-            self.0.begin_transaction().await,
-            self.1.clone(),
-        )
+        PersistentMemDbTransaction(self.0.begin_transaction().await, self.1.clone())
     }
 }
 

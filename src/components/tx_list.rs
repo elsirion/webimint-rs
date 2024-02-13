@@ -1,7 +1,6 @@
-use crate::client::Transaction;
 use leptos::*;
-use leptos_icons::*;
 
+use crate::client::Transaction;
 use crate::components::LoaderIcon;
 use crate::context::ClientContext;
 
@@ -9,21 +8,21 @@ use crate::context::ClientContext;
 // Receive e-cash component
 //
 #[component]
-pub fn TxList<F>(cx: Scope, update_signal: F) -> impl IntoView
+pub fn TxList<F>(update_signal: F) -> impl IntoView
 where
     F: Fn() + Copy + 'static,
 {
-    let ClientContext { client, .. } = expect_context::<ClientContext>(cx);
+    let ClientContext { client, .. } = expect_context::<ClientContext>();
 
-    let tx_list_resource = create_resource(cx, update_signal, move |()| async move {
+    let tx_list_resource = create_resource(update_signal, move |()| async move {
         let client = client.get_value();
         client.list_transactions().await.expect("list tx failed")
     });
 
-    view! { cx,
+    view! {
         <div>
             <Suspense
-                fallback=move || {view! {cx, <LoaderIcon />}}
+                fallback=move || {view! {<LoaderIcon />}}
             >
                 <table class="border-y border-slate-400 border-collapse table-auto w-full text-sm">
                     <thead class="bg-slate-50">
@@ -35,10 +34,10 @@ where
                     </thead>
                     <tbody>
                     {move || {
-                        tx_list_resource.read(cx).map(|transactions| {
+                        tx_list_resource.get().map(|transactions| {
                             transactions.into_iter()
                                 .map(|tx| {
-                                    view! {cx, <TxListRow transaction=tx />}
+                                    view! {<TxListRow transaction=tx />}
                                 })
                                 .collect::<Vec<_>>()
                         })
@@ -51,17 +50,20 @@ where
 }
 
 #[component]
-pub fn TxListRow(cx: Scope, transaction: Transaction) -> impl IntoView {
-    view! { cx,
+pub fn TxListRow(transaction: Transaction) -> impl IntoView {
+    view! {
         <tr class="border-y border-slate-300">
             <td class="text-center p-4">
                 {
                     match transaction.operation_kind.as_ref() {
-                        "ln" => view! {cx, <Icon icon=icon!(BsLightningCharge) width="2em" height="2em"/>}.into_view(cx),
-                        "mint" => view! {cx, <Icon icon=icon!(FaCoinsSolid) width="2em" height="2em"/>}.into_view(cx),
+                      // FIXME: Create icon components or use svg
+                        // "ln" => view! {<Icon icon=icon!(BsLightningCharge) width="2em" height="2em"/>},
+                        // "mint" => view! {<Icon icon=icon!(FaCoinsSolid) width="2em" height="2em"/>},
+                        "ln" => view! {<span>"+ln+"</span>},
+                        "mint" => view! {<span>"+m+"</span>},
                         other => {
                             let kind = other.to_owned();
-                            view! {cx, <span>{kind}</span>}.into_view(cx)
+                            view! {<span>{kind}</span>}
                         }
                     }
                 }

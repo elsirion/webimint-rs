@@ -1,5 +1,5 @@
 [package]
-name = "fedimint-leptos-test"
+name = "webimint"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,6 +7,12 @@ edition = "2021"
 
 [profile.release]
 opt-level = 'z'
+
+[profile.ci]
+inherits = "dev"
+incremental = false
+debug = "line-tables-only"
+lto = "off"
 
 [dependencies]
 async-trait = "0.1.68"
@@ -21,10 +27,9 @@ fedimint-prediction-markets-common = { git = "https://github.com/Fedimint-Predic
 fedimint-prediction-markets-client = { git = "https://github.com/Fedimint-Prediction-Markets/fedimint-prediction-markets" }
 futures = "0.3.28"
 hex = "0.4.3"
-leptos = { version = "0.4.8", features = ["csr"] }
-leptos-qr-scanner = { git = "https://github.com/elsirion/leptos-qr-scanner", rev = "75e976e99d9c1ed64921081a23f7da823d2a0b6d" }
-leptos_icons = { version = "0.0.15", features = ["macros", "BsLightningCharge", "FaCoinsSolid"] }
-leptos_meta = { version = "0.4.8", features = ["csr"] }
+leptos = { version = "0.6.5", features = ["csr"] }
+leptos-qr-scanner = { git = "https://github.com/elsirion/leptos-qr-scanner", rev = "5830bd6f75d7836189ef1434f71a10222a737a44" }
+leptos_meta = { version = "0.6.5", features = ["csr"] }
 lightning-invoice = { version = "0.26.0", features = [ "serde" ] }
 qrcode-generator = "4.1.8"
 

@@ -1,15 +1,16 @@
-use super::submit_button::SubmitButton;
-use crate::utils::empty_view;
 use leptos::*;
 
+use super::submit_button::SubmitButton;
+use crate::utils::empty_view;
+
 #[component]
-pub fn LnReceiveForm<F>(cx: Scope, on_submit: F) -> impl IntoView
+pub fn LnReceiveForm<F>(on_submit: F) -> impl IntoView
 where
     F: Fn(u64, String) + 'static + Copy,
 {
-    let (amount, set_amount) = create_signal(cx, "".to_string());
-    let (description, set_description) = create_signal(cx, "".to_string());
-    let (error, set_error) = create_signal(cx, None);
+    let (amount, set_amount) = create_signal("".to_string());
+    let (description, set_description) = create_signal("".to_string());
+    let (error, set_error) = create_signal(None);
 
     let on_submit = move || {
         let amount_msat = match amount.get().parse::<u64>() {
@@ -26,7 +27,7 @@ where
         on_submit(amount_msat, description.get());
     };
 
-    view! { cx,
+    view! {
         <form
             on:submit=move |ev| {
                 ev.prevent_default();
@@ -44,14 +45,14 @@ where
             />
             {move || {
                 if let Some(error) = error.get() {
-                    view!{cx,
+                    view!{
                         <div class="bg-orange-100 border-l-4 border-orange-500 text-orange-700 p-4" role="alert">
                           <p class="font-bold">Error</p>
                           <p>{error}</p>
                         </div>
-                    }.into_view(cx)
+                    }.into_view()
                 } else {
-                    empty_view().into_view(cx)
+                    empty_view().into_view()
                 }
             }}
             <input
@@ -65,8 +66,8 @@ where
             />
             <SubmitButton
                 class="my-4 w-full"
-                loading=create_signal(cx, false).0
-                disabled=Signal::derive(cx, move || false)
+                loading=create_signal(false).0
+                disabled=Signal::derive(move || false)
                 on_click=move |_| {}
             >
                 "Generate Invoice"

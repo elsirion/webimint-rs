@@ -48,43 +48,6 @@ function check_cargo_lock() {
 }
 export -f check_cargo_lock
 
-function check_check_forbidden_dependencies() {
-    set -euo pipefail
-
-    #!/usr/bin/env bash
-
-    set -eo pipefail
-
-    if grep -E "(fedimint-mint|fedimint-wallet|fedimint-ln)" fedimint-server/Cargo.toml >&2 ; then
-      >&2 echo "fedimint-server/Cargo.toml must not depend on modules"
-      return 1
-    fi
-    if grep -E "(fedimint-mint|fedimint-wallet|fedimint-ln)" fedimint-testing/Cargo.toml >&2 ; then
-      >&2 echo "fedimint-testing/Cargo.toml must not depend on modules"
-      return 1
-    fi
-    find gateway/ -name Cargo.toml | while read -r cargo_toml ; do
-      if grep -E "fedimint-server" "$cargo_toml" >&2 ; then
-        >&2 echo "$cargo_toml must not depend on fedimint-server"
-        return 1
-      fi
-    done
-    find fedimint-client/ -name Cargo.toml | while read -r cargo_toml ; do
-      if grep -E "fedimint-server" "$cargo_toml" >&2 ; then
-        >&2 echo "$cargo_toml must not depend on fedimint-server"
-        return 1
-      fi
-    done
-    find ./ -name Cargo.lock | while read -r cargo_lock ; do
-      if grep -E "openssl" "$cargo_lock" >&2 ; then
-        >&2 echo "$cargo_lock must not depend on openssl"
-        return 1
-      fi
-    done
-
-}
-export -f check_check_forbidden_dependencies
-
 function check_leftover_dbg() {
     set -euo pipefail
 
@@ -104,31 +67,6 @@ function check_leftover_dbg() {
 }
 export -f check_leftover_dbg
 
-function check_semgrep() {
-    set -euo pipefail
-
-    # semgrep is not available on MacOS
-    if ! command -v semgrep > /dev/null ; then
-      >&2 echo "Skipping semgrep check: not available"
-      return 0
-    fi
-
-    if [ ! -f .config/semgrep.yaml ] ; then
-      >&2 echo "Skipping semgrep check: .config/semgrep.yaml doesn't exist"
-      return 0
-    fi
-
-    if [ ! -s .config/semgrep.yaml ] ; then
-      >&2 echo "Skipping semgrep check: .config/semgrep.yaml empty"
-      return 0
-    fi
-
-    env SEMGREP_ENABLE_VERSION_CHECK=0 \
-      semgrep -q --error --no-rewrite-rule-ids --config .config/semgrep.yaml
-
-}
-export -f check_semgrep
-
 function check_shellcheck() {
     set -euo pipefail
 
@@ -142,8 +80,13 @@ export -f check_shellcheck
 function check_trailing_whitespace() {
     set -euo pipefail
 
-    if ! git diff --check HEAD ; then
-      echo "Trailing whitespace detected. Please remove them before committing."
+    rev="HEAD"
+    if ! git rev-parse -q 1>/dev/null HEAD 2>/dev/null ; then
+      >&2 echo "Warning: no commits yet, checking against --root"
+      rev="--root"
+    fi
+    if ! git diff --check $rev ; then
+      >&2 echo "Trailing whitespace detected. Please remove them before committing."
       return 1
     fi
 
@@ -166,9 +109,7 @@ parallel \
 ::: \
     check_cargo_fmt \
     check_cargo_lock \
-    check_check_forbidden_dependencies \
     check_leftover_dbg \
-    check_semgrep \
     check_shellcheck \
     check_trailing_whitespace \
     check_typos \

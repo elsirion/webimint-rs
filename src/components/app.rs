@@ -1,30 +1,28 @@
-use crate::components::{Footer, Joined, Logo, SubmitForm, WalletSelector};
+use anyhow::anyhow;
+use leptos::{SignalGet, *};
+use leptos_meta::{Link, Meta, Title};
+use tracing::info;
 
 use crate::client::ClientRpc;
+use crate::components::service_worker::ServiceWorker;
+use crate::components::{Footer, Joined, Logo, SubmitForm, WalletSelector};
 use crate::context::provide_client_context;
 use crate::utils::empty_view;
-use anyhow::anyhow;
-use leptos::*;
-use leptos_meta::{Title, Meta, Link};
-use leptos::SignalGet;
-use tracing::info;
-use crate::components::service_worker::ServiceWorker;
 
 //
 // App component
 //
 #[component]
-pub fn App(cx: Scope) -> impl IntoView {
+pub fn App() -> impl IntoView {
     pub const CODE_VERSION: &str = env!("FEDIMINT_BUILD_CODE_VERSION");
 
     info!("Starting Webimint version {CODE_VERSION} ...");
 
     let client = ClientRpc::new();
-    provide_client_context(cx, client.clone());
+    provide_client_context(client.clone());
 
     let res_client = client.clone();
     let wallets_resource = create_resource(
-        cx,
         || (),
         move |()| {
             let client = res_client.clone();
@@ -33,13 +31,13 @@ pub fn App(cx: Scope) -> impl IntoView {
     );
 
     let action_client = client.clone();
-    let select_wallet_action = create_action(cx, move |wallet_name: &String| {
+    let select_wallet_action = create_action(move |wallet_name: &String| {
         let wallet_name = wallet_name.clone();
         let client = action_client.clone();
         async move { client.select_wallet(wallet_name).await.ok() }
     });
 
-    let join_action = create_action(cx, move |invite: &String| {
+    let join_action = create_action(move |invite: &String| {
         let invite = invite.clone();
         let client = client.clone();
         async move { client.join(invite).await }
@@ -60,7 +58,7 @@ pub fn App(cx: Scope) -> impl IntoView {
                 || select_wallet == Some(Some(true)))
     };
 
-    view! { cx,
+    view! {
       <ServiceWorker path="./service-worker.js" />
 
       <Title text="Webimint" />
@@ -80,19 +78,19 @@ pub fn App(cx: Scope) -> impl IntoView {
           <main class="w-full pb-24 flex-grow ">
             <Show
               when=show_select_wallet
-                fallback=|_| empty_view()
+                fallback=|| empty_view()
               >
               {
                   move || {
-                    if let Some(Some(wallets)) = wallets_resource.read(cx) {
-                      view! { cx,
+                    if let Some(Some(wallets)) = wallets_resource.get() {
+                      view! {
                         <WalletSelector
                           available=wallets
                           on_select=move |wallet_name| select_wallet_action.dispatch(wallet_name)
                         />
-                      }.into_view(cx)
+                      }.into_view()
                     } else {
-                      empty_view().into_view(cx)
+                      empty_view().into_view()
                     }
                   }
               }
@@ -100,7 +98,7 @@ pub fn App(cx: Scope) -> impl IntoView {
             </Show>
             <Show
               when=show_join
-                fallback=|_| empty_view()
+                fallback=|| empty_view()
               >
               <h1 class="font-heading text-gray-900 text-4xl font-semibold mb-6">"Join a Federation"</h1>
               <SubmitForm
@@ -114,9 +112,9 @@ pub fn App(cx: Scope) -> impl IntoView {
 
             <Show
               when=show_join_error
-              fallback=|_| empty_view()
+              fallback=|| empty_view()
             >
-              {move || view!{ cx, <div class="text-body text-md mt-4"><span class="text-red-500">{
+              {move || view!{<div class="text-body text-md mt-4"><span class="text-red-500">{
                 format!("✗ Failed to join federation: {:?}", join_action.value().with(|r| {
                   match r {
                     Some(Err(e)) =>anyhow!("{:?}", e),
@@ -128,7 +126,7 @@ pub fn App(cx: Scope) -> impl IntoView {
 
             <Show
               when=show_wallet
-              fallback=|_| empty_view()
+              fallback=|| empty_view()
             >
               <Joined />
             </Show>
