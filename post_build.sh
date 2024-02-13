@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-appName="fedimint-leptos-test"
+appName="webimint"
 stylePrefix="index"
 styleFormat="css"
 
