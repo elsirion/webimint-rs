@@ -3,9 +3,9 @@ use leptos::*;
 use crate::components::LogoFedimint;
 
 #[component]
-pub fn Footer(cx: Scope, version: &'static str, #[prop(optional, into)] class: String) -> impl IntoView {
+pub fn Footer(version: &'static str, #[prop(optional, into)] class: String) -> impl IntoView {
     let version_prefix: &'static str = &version[..7];
-    view! { cx,
+    view! {
       <div class={format!("flex justify-center items-center text-body text-sm text-gray-500 {class}")}>
         "Webimint version "
         <a

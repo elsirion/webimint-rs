@@ -6,7 +6,6 @@ use crate::components::SubmitButton;
 
 #[component]
 pub fn SubmitForm<F>(
-    cx: Scope,
     on_submit: F,
     placeholder: String,
     description: String,
@@ -16,14 +15,14 @@ pub fn SubmitForm<F>(
 where
     F: Fn(String) + 'static + Copy,
 {
-    let (value, set_value) = create_signal(cx, String::new());
+    let (value, set_value) = create_signal(String::new());
 
-    let button_is_disabled = Signal::derive(cx, move || loading.get() || value.get().is_empty());
-    let scan_disabled = Signal::derive(cx, move || loading.get());
+    let button_is_disabled = Signal::derive(move || loading.get() || value.get().is_empty());
+    let scan_disabled = Signal::derive(move || loading.get());
 
-    let (scan, set_scan) = create_signal(cx, false);
+    let (scan, set_scan) = create_signal(false);
 
-    let textarea = view! {cx,
+    let textarea = view! {
         <textarea
           class="my-8 w-full text-xl font-body text-gray-600 border-gray-400 placeholder:text-gray-400 ring-0 focus:border-blue-400 focus:ring-0"
           rows="4"
@@ -48,7 +47,7 @@ where
         />
     };
 
-    let qr_scanner = view! { cx,
+    let qr_scanner = view! {
         <Scan
           active=scan
           on_scan=move |invite| {
@@ -60,13 +59,13 @@ where
         />
     };
 
-    view! { cx,
+    view! {
       <form on:submit=|ev| ev.prevent_default()>
 
       <p class="font-body text-gray-600 text-xl">{description}</p>
       <Show
         when=move || scan.get()
-        fallback=move |_| textarea.clone()
+        fallback=move || textarea.clone()
       >
         {qr_scanner.clone()}
       </Show>

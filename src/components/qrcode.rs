@@ -2,7 +2,6 @@ use leptos::*;
 
 #[component]
 pub fn QrCode(
-    cx: Scope,
     #[prop(into)] data: Signal<String>,
     #[prop(optional, into)] qr_image_size: Option<usize>,
     #[prop(optional, into)] class: Option<String>,
@@ -22,7 +21,7 @@ pub fn QrCode(
         format!("data:image/png;base64,{png_base64}")
     };
 
-    view! { cx,
+    view! {
         <img
             src=qr_data_url
             class=class
