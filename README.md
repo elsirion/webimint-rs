@@ -59,9 +59,9 @@ trunk serve
 Your output will look like this:
 
 ```shell
-webimint-rs$ nix develop
+$ nix develop
 💡 Run 'just' for a list of available 'just ...' helper recipes
-webimint-rs trunk serve
+$ trunk serve
 2023-08-06T12:00:41.373844Z  INFO 📦 starting build
 2023-08-06T12:00:41.374062Z  INFO spawning asset pipelines
 2023-08-06T12:00:41.522959Z  INFO building webimint
