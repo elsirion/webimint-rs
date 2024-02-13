@@ -59,16 +59,16 @@ trunk serve
 Your output will look like this:
 
 ```shell
-fedimint-leptos-test$ nix develop
+$ nix develop
 💡 Run 'just' for a list of available 'just ...' helper recipes
-fedimint-leptos-test$ trunk serve
+$ trunk serve
 2023-08-06T12:00:41.373844Z  INFO 📦 starting build
 2023-08-06T12:00:41.374062Z  INFO spawning asset pipelines
-2023-08-06T12:00:41.522959Z  INFO building fedimint-leptos-test
+2023-08-06T12:00:41.522959Z  INFO building webimint
     Finished dev [unoptimized + debuginfo] target(s) in 0.14s
 2023-08-06T12:00:41.673972Z  INFO fetching cargo artifacts
-2023-08-06T12:00:41.834730Z  INFO processing WASM for fedimint-leptos-test
-2023-08-06T12:00:41.933395Z  INFO calling wasm-bindgen for fedimint-leptos-test
+2023-08-06T12:00:41.834730Z  INFO processing WASM for webimint
+2023-08-06T12:00:41.933395Z  INFO calling wasm-bindgen for webimint
 2023-08-06T12:00:42.907392Z  INFO copying generated wasm-bindgen artifacts
 2023-08-06T12:00:42.919447Z  INFO applying new distribution
 2023-08-06T12:00:42.919736Z  INFO ✅ success
