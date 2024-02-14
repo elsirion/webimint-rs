@@ -8,7 +8,7 @@ use fedimint_prediction_markets_common::{
     Candlestick, ContractOfOutcomeAmount, Market, MarketInformation, Order, OrderIdClientSide,
     Outcome, Seconds, Side, UnixTimestamp, Weight, WeightRequiredForPayout,
 };
-use leptos::warn;
+use tracing::warn;
 use secp256k1::PublicKey;
 use serde::Serialize;
 use tokio::sync::oneshot::{self};

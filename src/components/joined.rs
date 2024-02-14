@@ -151,7 +151,7 @@ pub fn Joined() -> impl IntoView {
       </Show>
       <Show
           when=move || tab.get() == Tab::PredictionMarkets
-          fallback=|_| empty_view()
+          fallback=|| empty_view()
           >
           <PredictionMarketsHome />
       </Show>

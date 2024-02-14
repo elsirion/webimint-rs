@@ -2,6 +2,7 @@ use fedimint_prediction_markets_common::config::GeneralConsensus;
 use leptos::*;
 use secp256k1::PublicKey;
 use tracing::warn;
+use tracing::error;
 
 use crate::context::ClientContext;
 use crate::prediction_markets::components::{NewMarket, PayoutControls, ViewMarket};
@@ -14,11 +15,10 @@ pub struct PredictionMarketsStaticDataContext {
 }
 
 #[component]
-pub fn PredictionMarketsHome(cx: Scope) -> impl IntoView {
-    let ClientContext { client, .. } = expect_context::<ClientContext>(cx);
+pub fn PredictionMarketsHome() -> impl IntoView {
+    let ClientContext { client, .. } = expect_context::<ClientContext>();
 
     let static_data_resource = create_resource(
-        cx,
         || (),
         move |_| async move {
             let Ok(client_payout_control) = client.get_value().get_client_payout_control().await
@@ -32,7 +32,6 @@ pub fn PredictionMarketsHome(cx: Scope) -> impl IntoView {
             };
 
             provide_context(
-                cx,
                 PredictionMarketsStaticDataContext {
                     client_payout_control,
                     general_consensus,
@@ -43,7 +42,7 @@ pub fn PredictionMarketsHome(cx: Scope) -> impl IntoView {
         },
     );
 
-    let sync_and_withdraw_available_bitcoin = create_action(cx, move |()| async move {
+    let sync_and_withdraw_available_bitcoin = create_action(move |()| async move {
         _ = client
             .get_value()
             .sync_orders(true, None, None)
@@ -64,12 +63,12 @@ pub fn PredictionMarketsHome(cx: Scope) -> impl IntoView {
     });
     sync_and_withdraw_available_bitcoin.dispatch(());
 
-    let tab = create_rw_signal(cx, Tab::ClientPayoutControl);
+    let tab = create_rw_signal(Tab::ClientPayoutControl);
 
-    view! { cx,
+    view! { 
         <Show
-            when=move || matches!{static_data_resource.read(cx), Some(Ok(()))}
-            fallback=|_| empty_view()
+            when=move || matches!{static_data_resource.get(), Some(Ok(()))}
+            fallback=|| empty_view()
         >
             <div class="flex">
                 <button
@@ -104,19 +103,19 @@ pub fn PredictionMarketsHome(cx: Scope) -> impl IntoView {
             <div>
                 <Show
                     when=move || matches!{tab.get(), Tab::ClientPayoutControl}
-                    fallback=|_| empty_view()
+                    fallback=|| empty_view()
                 >
                     <PayoutControls />
                 </Show>
                 <Show
                     when=move || matches!{tab.get(), Tab::NewMarket}
-                    fallback=|_| empty_view()
+                    fallback=|| empty_view()
                 >
                     <NewMarket />
                 </Show>
                 <Show
                     when=move || matches!{tab.get(), Tab::ViewMarket}
-                    fallback=|_| empty_view()
+                    fallback=|| empty_view()
                 >
                     <ViewMarket />
                 </Show>

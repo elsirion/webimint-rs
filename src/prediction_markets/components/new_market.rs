@@ -12,28 +12,27 @@ use crate::context::ClientContext;
 use crate::prediction_markets::helpers::js_string_to_unix_timestamp;
 
 #[component]
-pub fn NewMarket(cx: Scope) -> impl IntoView {
-    let ClientContext { client, .. } = expect_context::<ClientContext>(cx);
+pub fn NewMarket() -> impl IntoView {
+    let ClientContext { client, .. } = expect_context::<ClientContext>();
 
-    let form_contract_price = create_rw_signal(cx, "1000".to_owned());
-    let form_outcomes = create_rw_signal(cx, "2".to_owned());
+    let form_contract_price = create_rw_signal("1000".to_owned());
+    let form_outcomes = create_rw_signal("2".to_owned());
     let form_payout_control_weights: RwSignal<Vec<(RwSignal<String>, RwSignal<String>)>> =
         create_rw_signal(
-            cx,
             vec![(
-                create_rw_signal(cx, "".to_owned()),
-                create_rw_signal(cx, "".to_owned()),
+                create_rw_signal("".to_owned()),
+                create_rw_signal("".to_owned()),
             )],
         );
-    let form_weight_required_for_payout = create_rw_signal(cx, "1".to_owned());
-    let form_payout_controls_fee_per_contract = create_rw_signal(cx, "0".to_owned());
+    let form_weight_required_for_payout = create_rw_signal("1".to_owned());
+    let form_payout_controls_fee_per_contract = create_rw_signal("0".to_owned());
 
-    let form_title = create_rw_signal(cx, "".to_owned());
-    let form_description = create_rw_signal(cx, "".to_owned());
-    let form_outcome_titles: RwSignal<Vec<RwSignal<String>>> = create_rw_signal(cx, vec![]);
-    let form_expected_payout_timestamp = create_rw_signal(cx, "".to_owned());
+    let form_title = create_rw_signal("".to_owned());
+    let form_description = create_rw_signal("".to_owned());
+    let form_outcome_titles: RwSignal<Vec<RwSignal<String>>> = create_rw_signal(vec![]);
+    let form_expected_payout_timestamp = create_rw_signal("".to_owned());
 
-    let new_market_action = create_action(cx, move |_| async move {
+    let new_market_action = create_action(move |_| async move {
         let contract_price = form_contract_price
             .get_untracked()
             .parse::<Amount>()
@@ -116,7 +115,7 @@ pub fn NewMarket(cx: Scope) -> impl IntoView {
         r
     });
 
-    create_effect(cx, move |_| {
+    create_effect(move |_| {
         let Ok(outcomes) = form_outcomes.get().parse::<Outcome>() else {
             return;
         };
@@ -124,12 +123,12 @@ pub fn NewMarket(cx: Scope) -> impl IntoView {
         form_outcome_titles.update(|v| {
             v.clear();
             for _ in 0..outcomes {
-                v.push(create_rw_signal(cx, "".to_owned()));
+                v.push(create_rw_signal("".to_owned()));
             }
         })
     });
 
-    view! {cx,
+    view! {
         <div class="flex flex-col gap-1 border p-2">
             <label>"Title"</label>
             <input type="text"
@@ -159,7 +158,6 @@ pub fn NewMarket(cx: Scope) -> impl IntoView {
                         .enumerate()
                         .map(|(i, outcome_title)| {
                             view! {
-                                cx,
                                 <input 
                                     type="text"
                                     class="flex-[0_0_32%]"
@@ -169,7 +167,7 @@ pub fn NewMarket(cx: Scope) -> impl IntoView {
                                 />
                             }
                         })
-                        .collect_view(cx)
+                        .collect_view()
                 }}
             </div>
 
@@ -193,7 +191,6 @@ pub fn NewMarket(cx: Scope) -> impl IntoView {
                     .enumerate()
                     .map(|(i,(payout_control, weight))| {
                         view! {
-                            cx,
                             <div class="flex gap-2">
                                 <button
                                     class="border p-2 hover:bg-red-500 cursor-pointer"
@@ -222,7 +219,7 @@ pub fn NewMarket(cx: Scope) -> impl IntoView {
                             </div>
                         }
                     })
-                    .collect_view(cx)
+                    .collect_view()
                 }
             }
             <button
@@ -230,7 +227,7 @@ pub fn NewMarket(cx: Scope) -> impl IntoView {
                 on:click=move |_| {
                     form_payout_control_weights.update(|v| {
                         v.push(
-                            (create_rw_signal(cx, "".to_owned()), create_rw_signal(cx, "".to_owned()))
+                            (create_rw_signal("".to_owned()), create_rw_signal("".to_owned()))
                         );
                     });
                 }

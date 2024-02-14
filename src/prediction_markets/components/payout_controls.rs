@@ -2,6 +2,7 @@ use std::str::FromStr;
 
 use leptos::*;
 use secp256k1::PublicKey;
+use tracing::warn;
 
 use super::PredictionMarketsStaticDataContext;
 use crate::context::ClientContext;
@@ -9,11 +10,10 @@ use crate::prediction_markets::js;
 use crate::utils::empty_view;
 
 #[component]
-pub fn PayoutControls(cx: Scope) -> impl IntoView {
-    let reload_name_to_payout_control_table = create_rw_signal(cx, ());
+pub fn PayoutControls() -> impl IntoView {
+    let reload_name_to_payout_control_table = create_rw_signal(());
 
     view! {
-        cx,
         <div class="flex flex-col gap-2">
             <ClientPayoutControl />
             <SetNameToPayoutControl reload_name_to_payout_control_table=reload_name_to_payout_control_table />
@@ -23,13 +23,13 @@ pub fn PayoutControls(cx: Scope) -> impl IntoView {
 }
 
 #[component]
-pub fn ClientPayoutControl(cx: Scope) -> impl IntoView {
+pub fn ClientPayoutControl() -> impl IntoView {
     let PredictionMarketsStaticDataContext {
         client_payout_control,
         general_consensus: _,
-    } = expect_context::<PredictionMarketsStaticDataContext>(cx);
+    } = expect_context::<PredictionMarketsStaticDataContext>();
 
-    view! { cx,
+    view! {
         <div class="border-[1px] p-2">
             <p class="border-b text-lg">"Your Payout Control"</p>
             <div class="flex gap-3 p-2">
@@ -48,16 +48,13 @@ pub fn ClientPayoutControl(cx: Scope) -> impl IntoView {
 }
 
 #[component]
-pub fn SetNameToPayoutControl(
-    cx: Scope,
-    reload_name_to_payout_control_table: RwSignal<()>,
-) -> impl IntoView {
-    let ClientContext { client, .. } = expect_context::<ClientContext>(cx);
+pub fn SetNameToPayoutControl(reload_name_to_payout_control_table: RwSignal<()>) -> impl IntoView {
+    let ClientContext { client, .. } = expect_context::<ClientContext>();
 
-    let form_name = create_rw_signal(cx, "".to_owned());
-    let form_payout_control = create_rw_signal(cx, "".to_owned());
+    let form_name = create_rw_signal("".to_owned());
+    let form_payout_control = create_rw_signal("".to_owned());
 
-    let set_name_to_payout_control_action = create_action(cx, move |()| async move {
+    let set_name_to_payout_control_action = create_action(move |()| async move {
         let name = form_name.get_untracked();
         if name.len() == 0 {
             return Err("Name must have non-zero length".to_owned());
@@ -76,7 +73,7 @@ pub fn SetNameToPayoutControl(
             .map_err(|e| format!("Error setting name to public key: {e}"))?)
     });
 
-    view! { cx,
+    view! {
         <div class="flex flex-col gap-1 border-[1px] p-2">
             <h2 class="border-b text-lg">"Assign Name to Payout Control"</h2>
 
@@ -104,22 +101,20 @@ pub fn SetNameToPayoutControl(
 
 #[component]
 pub fn NameToPayoutControlTable(
-    cx: Scope,
     reload_name_to_payout_control_table: RwSignal<()>,
 ) -> impl IntoView {
-    let ClientContext { client, .. } = expect_context::<ClientContext>(cx);
+    let ClientContext { client, .. } = expect_context::<ClientContext>();
 
     let name_to_payout_control_map_resource = create_resource(
-        cx,
         move || (),
         move |()| async move { client.get_value().get_name_to_payout_control_map().await },
     );
-    create_effect(cx, move |_| {
+    create_effect(move |_| {
         _ = reload_name_to_payout_control_table.get();
         name_to_payout_control_map_resource.refetch();
     });
 
-    let set_name_to_none_action = create_action(cx, move |name: &String| {
+    let set_name_to_none_action = create_action(move |name: &String| {
         let name = name.to_owned();
         async move {
             _ = client
@@ -132,9 +127,9 @@ pub fn NameToPayoutControlTable(
         }
     });
 
-    let sorted_by_name = create_memo(cx, move |_| {
+    let sorted_by_name = create_memo(move |_| {
         let mut v = vec![];
-        let Some(Ok(m)) = name_to_payout_control_map_resource.read(cx) else {
+        let Some(Ok(m)) = name_to_payout_control_map_resource.get() else {
             return v;
         };
         for kv in m {
@@ -145,10 +140,10 @@ pub fn NameToPayoutControlTable(
         v
     });
 
-    view! {cx,
+    view! {
         <Show
-            when=move || matches!{name_to_payout_control_map_resource.read(cx), Some(Ok(_))}
-            fallback=|_| empty_view()
+            when=move || matches!{name_to_payout_control_map_resource.get(), Some(Ok(_))}
+            fallback=|| empty_view()
         >
             <table>
                 <thead>
@@ -163,7 +158,6 @@ pub fn NameToPayoutControlTable(
                         .map(|(name, public_key)| {
                             let action_name = name.to_owned();
                             view! {
-                                cx,
                                 <tr>
                                     <td
                                         class="border-[1px] p-2 text-center cursor-pointer hover:bg-red-500"
@@ -176,7 +170,7 @@ pub fn NameToPayoutControlTable(
                                 </tr>
                             }
                         })
-                        .collect_view(cx)
+                        .collect_view()
                 }}
             </table>
         </Show>

@@ -1943,7 +1943,7 @@ dependencies = [
  "rustc-hash",
  "self_cell",
  "serde",
- "serde-wasm-bindgen 0.5.0",
+ "serde-wasm-bindgen",
  "serde_json",
  "slotmap",
  "thiserror",
@@ -3593,7 +3593,7 @@ dependencies = [
 name = "wasm-bindgen-shared"
 version = "0.2.90"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d046c5d029ba91a1ed14da14dca44b68bf2f124cfbaf741c54151fdb3e0750b"
+checksum = "4d91413b1c31d7539ba5ef2451af3f0b833a005eb27a631cec32bc0635a8602b"
 
 [[package]]
 name = "wasm-streams"
@@ -3626,22 +3626,27 @@ dependencies = [
  "async-trait",
  "base64 0.21.3",
  "console_error_panic_hook",
- "fedimint-build",
+ "fedimint-build 0.2.1-rc1",
  "fedimint-client",
  "fedimint-core",
  "fedimint-ln-client",
  "fedimint-mint-client",
+ "fedimint-prediction-markets-client",
+ "fedimint-prediction-markets-common",
  "fedimint-wallet-client",
  "futures",
  "gloo-storage",
  "hex",
+ "js-sys",
  "leptos",
  "leptos-qr-scanner",
  "leptos_meta",
  "lightning-invoice",
  "qrcode-generator",
  "rand",
+ "secp256k1 0.24.3",
  "serde",
+ "serde-wasm-bindgen",
  "thiserror",
  "tokio",
  "tokio-stream",
