@@ -1,6 +1,6 @@
 use leptos::*;
 
-use super::submit_button::SubmitButton;
+use super::{ErrorBlock, SubmitButton};
 use crate::utils::empty_view;
 
 #[component]
@@ -46,10 +46,9 @@ where
             {move || {
                 if let Some(error) = error.get() {
                     view!{
-                        <div class="bg-orange-100 border-l-4 border-orange-500 text-orange-700 p-4" role="alert">
-                          <p class="font-bold">Error</p>
-                          <p>{error}</p>
-                        </div>
+                        <ErrorBlock>
+                            { error }
+                        </ErrorBlock>
                     }.into_view()
                 } else {
                     empty_view().into_view()

@@ -4,7 +4,7 @@ use crate::components::SubmitForm;
 use crate::context::ClientContext;
 
 //
-// Receive LN component
+// Send LN component
 //
 #[component]
 pub fn Send() -> impl IntoView {

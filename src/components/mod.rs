@@ -1,3 +1,4 @@
+pub mod alerts;
 pub mod app;
 pub mod balance;
 pub mod footer;
@@ -16,6 +17,7 @@ pub mod submit_form;
 pub mod tx_list;
 pub mod wallet_selector;
 
+pub use alerts::*;
 pub use app::*;
 pub use balance::*;
 pub use footer::*;
