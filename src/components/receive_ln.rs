@@ -1,5 +1,6 @@
 use leptos::*;
 
+use super::{ErrorBlock, SuccessBlock};
 use crate::components::ln_receive_form::LnReceiveForm;
 use crate::components::loader_icon::LoaderIcon;
 use crate::components::qrcode::QrCode;
@@ -59,10 +60,7 @@ pub fn ReceiveLn() -> impl IntoView {
 
                                     match paid_resource.get() {
                                         Some(()) => view! {
-                                            <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 w-full mb-8" role="alert">
-                                                <p class="font-bold">Success</p>
-                                                <p>The invoice has been paid!</p>
-                                            </div>
+                                            <SuccessBlock text="The invoice has been paid!" />
                                         }.into_view(),
                                         None => empty_view().into_view(),
                                     }
@@ -77,10 +75,7 @@ pub fn ReceiveLn() -> impl IntoView {
                     }
                     Some(Err(e)) => {
                         view!{
-                            <div class="bg-orange-100 border-l-4 border-orange-500 text-orange-700 p-4 w-full" role="alert">
-                                <p class="font-bold">Error</p>
-                                <p>{e.to_string()}</p>
-                            </div>
+                            <ErrorBlock text=e.to_string() />
                         }.into_view()
                     }
                     None => {

@@ -1,6 +1,6 @@
 use leptos::*;
 
-use super::submit_form::SubmitForm;
+use super::{NoteBlock, SubmitForm, WarningBlock};
 
 #[component]
 pub fn WalletSelector<F>(available: Vec<String>, on_select: F) -> impl IntoView
@@ -35,16 +35,10 @@ where
         .collect::<Vec<_>>();
 
     view! {
-        <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-8" role="alert">
-          <p class="font-bold">Note</p>
-          <p> "To switch wallets after selecting one just reload the web app." </p>
-        </div>
-        <div class="bg-orange-100 border-l-4 border-orange-500 text-orange-700 p-4 mb-8" role="alert">
-          <p class="font-bold">Warning</p>
-          <p>
-            "Webimint is a highly experimental Fedimint wallet, use at your own risk. It's currently compatible with the 0.2 release of Fedimint."
-          </p>
-        </div>
+        <NoteBlock text="To switch wallets after selecting one just reload the web app." />
+        <WarningBlock text="Webimint is a highly experimental Fedimint wallet, use at your own risk.
+          It's currently compatible with the 0.2 release of Fedimint." />
+
         <h1 class="font-heading text-gray-900 text-4xl font-semibold mb-6">"Select a wallet:"</h1>
         <ul class="mb-6 list-disc">
           { available_list }
