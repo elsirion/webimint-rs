@@ -1,5 +1,5 @@
-var buildVersion = "20e715169b4deeff"
-var cssBuildVersion = "e155b3cd3af1ec3e"
+var buildVersion = "15f8f6ee459160c2"
+var cssBuildVersion = "e155362105b5574f"
 var cacheName = "webimint";
 
 var filesToCache = [
