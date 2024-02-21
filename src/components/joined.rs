@@ -81,7 +81,7 @@ where
             {
                 items.iter().enumerate().map(|(i, item)| {
                     view! {
-                        <li class="flex-grow">
+                        <li class="flex-1">
                             <button
                                 on:click=move |_| {
                                     set_tab.set(i);
