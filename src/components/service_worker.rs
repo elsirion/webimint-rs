@@ -1,4 +1,7 @@
-use leptos::{component, create_action, window, IntoView};
+use leptos::{component, create_action, create_effect, IntoView, SignalGet};
+use leptos_use::{
+    use_service_worker_with_options, ServiceWorkerRegistrationError, UseServiceWorkerOptions,
+};
 use tracing::{info, warn};
 
 use crate::utils::empty_view;
@@ -9,14 +12,18 @@ pub fn ServiceWorker(#[prop(into)] path: String) -> impl IntoView {
         let script_url = script_url.to_owned();
         async move {
             info!("Registering service worker: {}", script_url);
-            let promise = window()
-                .navigator()
-                .service_worker()
-                .register(script_url.as_str());
-            if let Err(e) = wasm_bindgen_futures::JsFuture::from(promise).await {
-                warn!("Service worker registration failed: {:?}", e);
-            }
-            info!("Service worker registered");
+
+            let handle = use_service_worker_with_options(
+                UseServiceWorkerOptions::default().script_url(script_url),
+            );
+
+            create_effect(move |_| match handle.registration.get() {
+                Ok(_) => info!("Service worker registered"),
+                Err(ServiceWorkerRegistrationError::Js(e)) => {
+                    warn!("Service worker registration failed: {:?}", e)
+                }
+                Err(ServiceWorkerRegistrationError::NeverQueried) => {}
+            });
         }
     });
 
