@@ -14,9 +14,20 @@ where
 {
     let ClientContext { client, .. } = expect_context::<ClientContext>();
 
-    let tx_list_resource = create_resource(update_signal, move |()| async move {
-        let client = client.get_value();
-        client.list_transactions().await.expect("list tx failed")
+    let tx_list_resource = create_resource(
+        || (),
+        move |()| async move {
+            let client = client.get_value();
+            client.list_transactions().await.expect("list tx failed")
+        },
+    );
+
+    create_effect(move |p| {
+        update_signal();
+
+        if matches!(p, Some(_)) {
+            tx_list_resource.refetch()
+        }
     });
 
     view! {
