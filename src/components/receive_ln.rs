@@ -60,7 +60,7 @@ pub fn ReceiveLn() -> impl IntoView {
 
                                     match paid_resource.get() {
                                         Some(()) => view! {
-                                            <SuccessBlock text="The invoice has been paid!" />
+                                            <SuccessBlock content="The invoice has been paid!".into_view() />
                                         }.into_view(),
                                         None => empty_view().into_view(),
                                     }
@@ -75,7 +75,7 @@ pub fn ReceiveLn() -> impl IntoView {
                     }
                     Some(Err(e)) => {
                         view!{
-                            <ErrorBlock text=e.to_string() />
+                            <ErrorBlock content=e.to_string().into_view() />
                         }.into_view()
                     }
                     None => {

@@ -46,7 +46,7 @@ where
             {move || {
                 if let Some(error) = error.get() {
                     view!{
-                        <ErrorBlock text=error />
+                        <ErrorBlock content=error.into_view() />
                     }.into_view()
                 } else {
                     empty_view().into_view()

@@ -35,9 +35,9 @@ where
         .collect::<Vec<_>>();
 
     view! {
-        <NoteBlock text="To switch wallets after selecting one just reload the web app." />
-        <WarningBlock text="Webimint is a highly experimental Fedimint wallet, use at your own risk.
-          It's currently compatible with the 0.2 release of Fedimint." />
+        <NoteBlock content="To switch wallets after selecting one just reload the web app.".into_view() />
+        <WarningBlock content="Webimint is a highly experimental Fedimint wallet, use at your own risk.
+          It's currently compatible with the 0.2 release of Fedimint.".into_view() />
 
         <h1 class="font-heading text-gray-900 text-4xl font-semibold mb-6">"Select a wallet:"</h1>
         <ul class="mb-6 list-disc">
