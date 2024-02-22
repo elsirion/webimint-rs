@@ -1,6 +1,7 @@
 pub mod alerts;
 pub mod app;
 pub mod balance;
+pub mod copyable_text;
 pub mod footer;
 pub mod joined;
 pub mod ln_receive_form;
@@ -20,6 +21,7 @@ pub mod wallet_selector;
 pub use alerts::*;
 pub use app::*;
 pub use balance::*;
+pub use copyable_text::*;
 pub use footer::*;
 pub use joined::*;
 pub use loader_icon::*;

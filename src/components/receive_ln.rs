@@ -1,6 +1,6 @@
 use leptos::*;
 
-use super::{ErrorBlock, SuccessBlock};
+use super::{CopyableText, ErrorBlock, SuccessBlock};
 use crate::components::ln_receive_form::LnReceiveForm;
 use crate::components::loader_icon::LoaderIcon;
 use crate::components::qrcode::QrCode;
@@ -67,7 +67,10 @@ pub fn ReceiveLn() -> impl IntoView {
                                         None => empty_view().into_view(),
                                     }
                                 }}
-                                <span class="break-all" style="font-family: mono">{&invoice}</span>
+                                <CopyableText
+                                    text={ Signal::derive(move || invoice.clone()) }
+                                    rows=9
+                                />
                                 <QrCode
                                     data={Signal::derive(move || qr_invoice_upper.clone())}
                                     class="w-full mt-8"
