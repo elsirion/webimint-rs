@@ -1,6 +1,6 @@
 use std::fmt::{Debug, Formatter};
 use std::str::FromStr;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 use fedimint_client::secret::{PlainRootSecretStrategy, RootSecretStrategy};
 use fedimint_client::{Client, FederationInfo};
@@ -36,7 +36,8 @@ enum RpcRequest {
     Join(String),
     GetName,
     SubscribeBalance,
-    Receive(String),
+    EcashSend(Amount),
+    EcashReceive(String),
     LnSend(String),
     LnReceive { amount: Amount, description: String },
     // TODO: pagination
@@ -51,7 +52,8 @@ enum RpcResponse {
     Join,
     GetName(String),
     SubscribeBalance(BoxStream<'static, Amount>),
-    Receive(Amount),
+    EcashSend(OOBNotes),
+    EcashReceive(Amount),
     LnSend,
     LnReceive {
         invoice: String,
@@ -256,7 +258,20 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
                     .send(Ok(RpcResponse::SubscribeBalance(stream)))
                     .map_err(|_| warn!("RPC receiver dropped before response was sent"));
             }
-            RpcRequest::Receive(notes) => {
+            RpcRequest::EcashSend(amount) => {
+                const TRY_CANCEL_AFTER: Duration = Duration::from_secs(60 * 60 * 24 * 3); // 3 days
+
+                let response = client
+                    .get_first_module::<MintClientModule>()
+                    .spend_notes(amount, TRY_CANCEL_AFTER, ())
+                    .await
+                    .map(|(_, notes)| RpcResponse::EcashSend(notes));
+
+                let _ = response_sender
+                    .send(response)
+                    .map_err(|_| warn!("RPC receiver dropped before response was sent"));
+            }
+            RpcRequest::EcashReceive(notes) => {
                 async fn receive_inner(
                     client: &Client,
                     notes: &str,
@@ -269,7 +284,7 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
                         .get_first_module::<MintClientModule>()
                         .reissue_external_notes(notes, ())
                         .await?;
-                    Ok(RpcResponse::Receive(amount))
+                    Ok(RpcResponse::EcashReceive(amount))
                 }
                 let _ = response_sender
                     .send(receive_inner(client, &notes).await)
@@ -467,15 +482,28 @@ impl ClientRpc {
         }
     }
 
-    pub async fn receive(&self, invoice: String) -> anyhow::Result<Amount, RpcError> {
+    pub async fn ecash_send(&self, amount: Amount) -> anyhow::Result<OOBNotes, RpcError> {
         let (response_sender, response_receiver) = oneshot::channel();
         self.sender
-            .send((RpcRequest::Receive(invoice), response_sender))
+            .send((RpcRequest::EcashSend(amount), response_sender))
             .await
             .expect("Client has stopped");
         let response = response_receiver.await.expect("Client has stopped")?;
         match response {
-            RpcResponse::Receive(amount) => Ok(amount),
+            RpcResponse::EcashSend(notes) => Ok(notes),
+            _ => Err(RpcError::InvalidResponse),
+        }
+    }
+
+    pub async fn ecash_receive(&self, invoice: String) -> anyhow::Result<Amount, RpcError> {
+        let (response_sender, response_receiver) = oneshot::channel();
+        self.sender
+            .send((RpcRequest::EcashReceive(invoice), response_sender))
+            .await
+            .expect("Client has stopped");
+        let response = response_receiver.await.expect("Client has stopped")?;
+        match response {
+            RpcResponse::EcashReceive(amount) => Ok(amount),
             _ => Err(RpcError::InvalidResponse),
         }
     }
