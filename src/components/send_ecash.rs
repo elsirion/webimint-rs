@@ -1,7 +1,9 @@
 use fedimint_core::Amount;
+use fedimint_mint_client::OOBNotes;
 use leptos::*;
 
-use super::{CopyableText, ErrorBlock, QrCode, SubmitButton, SuccessBlock};
+use super::{CopyableText, ErrorBlock, QrCode, SubmitButton, SuccessBlock, WarningBlock};
+use crate::client::RpcError;
 use crate::context::ClientContext;
 
 //
@@ -14,10 +16,20 @@ pub fn SendEcash() -> impl IntoView {
     let (amount, set_amount) = create_signal("".to_owned());
     let (error, set_error) = create_signal(None);
 
+    #[derive(Clone)]
+    struct ActionReturn {
+        requested_amount: Amount,
+        result: anyhow::Result<OOBNotes, RpcError>,
+    }
     let client = client.clone();
     let submit_action = create_action(move |amount: &Amount| {
-        let amount = amount.clone();
-        async move { client.get_value().ecash_send(amount).await }
+        let amount = amount.to_owned();
+        async move {
+            ActionReturn {
+                requested_amount: amount,
+                result: client.get_value().ecash_send(amount).await,
+            }
+        }
     });
 
     let parse_and_submit = move || {
@@ -67,7 +79,7 @@ pub fn SendEcash() -> impl IntoView {
 
             {move || {
                 submit_action.value().get().map(|r| {
-                    r.err().map(|err| {
+                    r.result.err().map(|err| {
                         view! {
                             <ErrorBlock>
                                 {format!("{:?}", err)}
@@ -79,13 +91,18 @@ pub fn SendEcash() -> impl IntoView {
 
             {move || {
                 submit_action.value().get().map(|r| {
-                    r.ok().map(|notes| {
+                    r.result.ok().map(move |notes| {
                         let total = notes.total_amount();
                         let notes_string_signal = Signal::derive(move || notes.to_string());
                         view! {
                             <SuccessBlock>
                                 {format!("Notes representing {} shown below.", total)}
                             </SuccessBlock>
+                            <Show when=move || total != r.requested_amount>
+                                <WarningBlock>
+                                    {format!("The notes represent {} more than the amount you requested.", total-r.requested_amount)}
+                                </WarningBlock>
+                            </Show>
                             <CopyableText
                                 text=notes_string_signal
                                 rows=10
