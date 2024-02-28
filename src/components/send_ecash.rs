@@ -70,7 +70,7 @@ pub fn SendEcash() -> impl IntoView {
             {move || {
                 error.get().map(|e| {
                     view! {
-                        <ErrorBlock>
+                        <ErrorBlock class="mb-8">
                             {e}
                         </ErrorBlock>
                     }
@@ -81,7 +81,7 @@ pub fn SendEcash() -> impl IntoView {
                 submit_action.value().get().map(|r| {
                     r.result.err().map(|err| {
                         view! {
-                            <ErrorBlock>
+                            <ErrorBlock class="mb-8">
                                 {format!("{:?}", err)}
                             </ErrorBlock>
                         }
@@ -95,7 +95,7 @@ pub fn SendEcash() -> impl IntoView {
                         let total = notes.total_amount();
                         let notes_string_signal = Signal::derive(move || notes.to_string());
                         view! {
-                            <SuccessBlock>
+                            <SuccessBlock class="mb-8">
                                 {format!("Notes representing {} shown below.", total)}
                             </SuccessBlock>
                             <Show when=move || total != r.requested_amount>

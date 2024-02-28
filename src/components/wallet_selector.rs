@@ -35,10 +35,10 @@ where
         .collect::<Vec<_>>();
 
     view! {
-        <NoteBlock>
+        <NoteBlock class="mb-8">
           "To switch wallets after selecting one just reload the web app."
         </NoteBlock>
-        <WarningBlock>
+        <WarningBlock class="mb-8">
           "Webimint is a highly experimental Fedimint wallet, use at your own risk.
           It's currently compatible with the 0.2 release of Fedimint."
         </WarningBlock>
