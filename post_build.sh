@@ -24,20 +24,17 @@ echo "Build-Version is: ${buildVersion}"
 # Replace placeholder in service-worker.js
 serviceWorkerJsFile=$(find ./dist/.stage -iname "service-worker.js")
 echo "Replacing {{buildVersion}} placeholder in: ${serviceWorkerJsFile}"
-sed "s/{{buildVersion}}/${buildVersion}/g" "${serviceWorkerJsFile}" >"${serviceWorkerJsFile}.modified"
-mv -f "${serviceWorkerJsFile}.modified" "${serviceWorkerJsFile}"
+sed -i "s/{{buildVersion}}/${buildVersion}/g" "${serviceWorkerJsFile}"
 
 # Replace placeholder in index.html
 indexHtmlFile=$(find ./dist/.stage -iname "index.html")
 echo "Replacing {{buildVersion}} placeholder in: ${indexHtmlFile}"
-sed "s/{{buildVersion}}/${buildVersion}/g" "${indexHtmlFile}" >"${indexHtmlFile}.modified"
-mv -f "${indexHtmlFile}.modified" "${indexHtmlFile}"
+sed -i "s/{{buildVersion}}/${buildVersion}/g" "${indexHtmlFile}"
 
 # Replace placeholder in manifest.json
 manifestJsonFile=$(find ./dist/.stage -iname "manifest.json")
 echo "Replacing {{buildVersion}} placeholder in: ${manifestJsonFile}"
-sed "s/{{buildVersion}}/${buildVersion}/g" "${manifestJsonFile}" >"${manifestJsonFile}.modified"
-mv -f "${manifestJsonFile}.modified" "${manifestJsonFile}"
+sed -i "s/{{buildVersion}}/${buildVersion}/g" "${manifestJsonFile}"
 
 # Extract CSS build version
 indexJsFile=$(find ./dist/.stage -iname "${stylePrefix}-*.${styleFormat}")
@@ -58,8 +55,7 @@ echo "CSS Build-Version is: ${cssBuildVersion}"
 # Replace placeholder in service-worker.js
 serviceWorkerJsFile=$(find ./dist/.stage -iname "service-worker.js")
 echo "Replacing {{cssBuildVersion}} placeholder in: ${serviceWorkerJsFile}"
-sed "s/{{cssBuildVersion}}/${cssBuildVersion}/g" "${serviceWorkerJsFile}" >"${serviceWorkerJsFile}.modified"
-mv -f "${serviceWorkerJsFile}.modified" "${serviceWorkerJsFile}"
+sed -i "s/{{cssBuildVersion}}/${cssBuildVersion}/g" "${serviceWorkerJsFile}"
 
 ### Required for chrome extension, no inline scripting
 echo "Extracting script content from index.html and creating initWebimint.js"
