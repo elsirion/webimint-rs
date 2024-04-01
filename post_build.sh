@@ -60,3 +60,10 @@ serviceWorkerJsFile=$(find ./dist/.stage -iname "service-worker.js")
 echo "Replacing {{cssBuildVersion}} placeholder in: ${serviceWorkerJsFile}"
 sed "s/{{cssBuildVersion}}/${cssBuildVersion}/g" "${serviceWorkerJsFile}" >"${serviceWorkerJsFile}.modified"
 mv -f "${serviceWorkerJsFile}.modified" "${serviceWorkerJsFile}"
+
+### Required for chrome extension, no inline scripting
+echo "Extracting script content from index.html and creating initWebimint.js"
+scriptContent=$(grep -oP '(?<=<script type=module>).*?(?=</script>)' "${indexHtmlFile}")
+echo "${scriptContent}" >./dist/.stage/initWebimint.js
+echo "Replacing original script tag in index.html with reference to initWebimint.js"
+sed -i 's|<script type=module>[^<]*</script>|<script type="module" src="/initWebimint.js"></script>|' "${indexHtmlFile}"
