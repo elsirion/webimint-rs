@@ -71,7 +71,7 @@ pub fn App() -> impl IntoView {
       <Meta name="theme-color" content="#ffffff" />
 
       <div class="h-[100dvh]">
-        <div class="mx-auto w-full h-full flex flex-col lg:max-w-[600px] p-6">
+        <div class="mx-auto w-full h-full flex flex-col min-w-[400px] lg:max-w-[600px] p-6">
           <header class="flex justify-center mb-20">
             <Logo class="bg-red border-1 border-blue"/>
           </header>
