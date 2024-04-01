@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
 appName="webimint"
 stylePrefix="index"
@@ -63,7 +63,7 @@ mv -f "${serviceWorkerJsFile}.modified" "${serviceWorkerJsFile}"
 
 ### Required for chrome extension, no inline scripting
 echo "Extracting script content from index.html and creating initWebimint.js"
-scriptContent=$(grep -oP '(?<=<script type=module>).*?(?=</script>)' "${indexHtmlFile}")
+scriptContent=$(sed -n 's|.*<script type=module>\(.*\)</script>.*|\1|p' "${indexHtmlFile}")
 echo "${scriptContent}" >./dist/.stage/initWebimint.js
 echo "Replacing original script tag in index.html with reference to initWebimint.js"
 sed -i 's|<script type=module>[^<]*</script>|<script type="module" src="/initWebimint.js"></script>|' "${indexHtmlFile}"
