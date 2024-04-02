@@ -6,7 +6,7 @@ use crate::components::LogoFedimint;
 pub fn Footer(version: &'static str, #[prop(optional, into)] class: String) -> impl IntoView {
     let version_prefix: &'static str = &version[..7];
     view! {
-      <div class={format!("flex justify-center items-center text-body text-sm text-gray-500 {class}")}>
+      <div class={format!("flex justify-center items-center text-body text-gray-500 {class}")}>
         "Webimint version "
         <a
           class="text-gray-950 font-mono mx-1"

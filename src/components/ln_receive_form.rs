@@ -37,7 +37,7 @@ where
             <input
                 type="number"
                 placeholder="Amount msat"
-                class="my-4 w-full text-xl font-body text-gray-600 border-gray-400 placeholder:text-gray-400 ring-0 focus:border-blue-400 focus:ring-0"
+                class="my-4 w-full font-body text-gray-600 border-gray-400 placeholder:text-gray-400 ring-0 focus:border-blue-400 focus:ring-0"
                 on:input=move |ev| {
                     set_amount.set(event_target_value(&ev));
                 }
@@ -57,7 +57,7 @@ where
             <input
                 type="text"
                 placeholder="Description"
-                class="my-4 w-full text-xl font-body text-gray-600 border-gray-400 placeholder:text-gray-400 ring-0 focus:border-blue-400 focus:ring-0"
+                class="my-4 w-full font-body text-gray-600 border-gray-400 placeholder:text-gray-400 ring-0 focus:border-blue-400 focus:ring-0"
                 on:input=move |ev| {
                     set_description.set(event_target_value(&ev));
                 }
