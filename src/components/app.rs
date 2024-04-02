@@ -70,7 +70,7 @@ pub fn App() -> impl IntoView {
       <Link rel="manifest" href="/manifest.json" />
       <Meta name="theme-color" content="#ffffff" />
 
-      <div class="h-[100dvh]">
+      <div class="text-sm sm:text-md md:text-lg lg:text-xl xl:text-2xl h-[100dvh]">
         <div class="mx-auto w-full h-full flex flex-col min-w-[400px] lg:max-w-[600px] p-6">
           <header class="flex justify-center mb-6 md:mb-20">
             <Logo class="bg-red border-1 border-blue"/>
