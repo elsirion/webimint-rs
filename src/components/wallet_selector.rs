@@ -1,6 +1,7 @@
 use leptos::*;
 
 use super::{NoteBlock, SubmitForm, WarningBlock};
+use crate::utils::empty_view;
 
 #[component]
 pub fn WalletSelector<F>(available: Vec<String>, on_select: F) -> impl IntoView
@@ -11,6 +12,13 @@ where
     let select = move |name: String| {
         set_loading.set(true);
         on_select(name);
+    };
+
+    let available_clone = available.clone();
+    let wallets_available = move || available_clone.len() > 0;
+    let description = match wallets_available() {
+        true => "… or create a new one".to_string(),
+        false => "Create a new wallet".to_string(),
     };
 
     let available_list = available
@@ -43,13 +51,15 @@ where
           It's currently compatible with the 0.2 release of Fedimint."
         </WarningBlock>
 
-        <h1 class="font-heading text-gray-900 text-4xl font-semibold mb-6">"Select a wallet:"</h1>
+        <Show when=wallets_available fallback=|| empty_view() >
+          <h1 class="font-heading text-gray-900 text-4xl font-semibold mb-6">"Select a wallet:"</h1>
+        </Show>
         <ul class="mb-6 list-disc">
           { available_list }
         </ul>
 
       <SubmitForm
-        description="… or create a new one".into()
+        description=description.into()
         on_submit=select
         placeholder="Wallet Name".into()
         submit_label="Create".into()
