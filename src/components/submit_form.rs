@@ -1,6 +1,8 @@
 use leptos::ev::KeyboardEvent;
+use leptos::html::Form;
 use leptos::*;
 use leptos_qr_scanner::Scan;
+use leptos_use::use_element_visibility;
 
 use crate::components::SubmitButton;
 
@@ -11,6 +13,7 @@ pub fn SubmitForm<F>(
     description: String,
     submit_label: String,
     loading: ReadSignal<bool>,
+    #[prop(default = false)] default_scan: bool,
 ) -> impl IntoView
 where
     F: Fn(String) + 'static + Copy,
@@ -20,7 +23,7 @@ where
     let button_is_disabled = Signal::derive(move || loading.get() || value.get().is_empty());
     let scan_disabled = Signal::derive(move || loading.get());
 
-    let (scan, set_scan) = create_signal(false);
+    let (scan, set_scan) = create_signal(default_scan);
 
     let textarea = view! {
         <textarea
@@ -47,9 +50,12 @@ where
         />
     };
 
+    let form_ref = create_node_ref::<Form>();
+    let is_visible = use_element_visibility(form_ref);
+
     let qr_scanner = view! {
         <Scan
-          active=scan
+          active=Signal::derive(move || scan.get() && is_visible.get())
           on_scan=move |invite| {
             set_scan.set(false);
             set_value.set(invite.clone());
@@ -60,7 +66,10 @@ where
     };
 
     view! {
-      <form on:submit=|ev| ev.prevent_default()>
+      <form
+        on:submit=|ev| ev.prevent_default()
+        node_ref=form_ref
+      >
 
       <p class="font-body text-gray-600 text-xl">{description}</p>
       <Show
@@ -88,7 +97,7 @@ where
         }
       >{move || {
         if scan.get() {
-          "Stop"
+          "Manual"
         } else {
           "Scan"
         }

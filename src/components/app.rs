@@ -111,6 +111,7 @@ pub fn App() -> impl IntoView {
                 placeholder="invite code".into()
                 submit_label="Join".into()
                 loading=join_action.pending()
+                default_scan=true
               />
             </Show>
 

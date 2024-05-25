@@ -24,6 +24,7 @@ pub fn ReceiveEcash() -> impl IntoView {
         placeholder="e-cash notes".into()
         submit_label="Redeem".into()
         loading=submit_action.pending()
+        default_scan=true
       />
 
       {move ||
