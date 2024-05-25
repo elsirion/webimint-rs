@@ -2,6 +2,7 @@ use leptos::*;
 
 use crate::components::SegmentedButton;
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Protocol {
     OnChain,
     Lightning,
