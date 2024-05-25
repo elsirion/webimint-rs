@@ -1,1 +1,1 @@
-import a,*as b from"/webimint-7a7e1d993b4740cd.js";a(`/webimint-7a7e1d993b4740cd_bg.wasm`);window.wasmBindings=b
+import a,*as b from"/webimint-5a48858a4b6430e0.js";a(`/webimint-5a48858a4b6430e0_bg.wasm`);window.wasmBindings=b
