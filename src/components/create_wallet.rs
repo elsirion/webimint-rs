@@ -28,6 +28,7 @@ where
         </button>
       </Show>
       <Show when=move || show_create_wallet_form.get() fallback=|| empty_view() >
+        <div class="w-full">
         <SubmitForm
           description="Enter a name for the new wallet".into()
           on_submit=move |name| {
@@ -38,6 +39,7 @@ where
           submit_label="Create".into()
           loading=loading
         />
+        </div>
       </Show>
     </div>
         }

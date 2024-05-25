@@ -24,6 +24,7 @@ pub fn SendLn() -> impl IntoView {
         placeholder="LN invoice".into()
         submit_label="Send".into()
         loading=submit_action.pending()
+        default_scan=true
       />
 
 

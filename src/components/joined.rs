@@ -1,6 +1,6 @@
 use leptos::*;
 
-use crate::components::{Balance, ReceiveEcash, ReceiveLn, SendEcash, SendLn, TxList};
+use crate::components::{Balance, Receive, Send, TxList};
 use crate::context::ClientContext;
 
 //
@@ -36,20 +36,12 @@ pub fn Joined() -> impl IntoView {
             view: view! { <TxList update_signal=move || tab_change_signal.get() /> },
         },
         MenuItem {
-            title: "Spend".into(),
-            view: view! { <SendEcash /> },
+            title: "Send".into(),
+            view: view! { <Send /> },
         },
         MenuItem {
-            title: "Redeem".into(),
-            view: view! { <ReceiveEcash /> },
-        },
-        MenuItem {
-            title: "LN Send".into(),
-            view: view! { <SendLn /> },
-        },
-        MenuItem {
-            title: "LN Receive".into(),
-            view: view! { <ReceiveLn /> },
+            title: "Receive".into(),
+            view: view! { <Receive /> },
         },
     ];
 
