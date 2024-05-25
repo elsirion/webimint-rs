@@ -17,19 +17,21 @@ where
     let available_clone = available.clone();
     let wallets_available = move || available_clone.len() > 0;
 
+    const MAX_NAME_LEN: usize = 20;
+
     let available_list = available
         .into_iter()
         .map(|name| {
             let select_name = name.clone();
-            let abbreviated_name = if name.len() > 10 {
-                let part_len = 10 / 2 - 1;
+            let abbreviated_name = if name.len() > MAX_NAME_LEN {
+                let part_len = MAX_NAME_LEN / 2 - 1;
                 format!("{}...{}", &name[..part_len], &name[name.len() - part_len..])
             } else {
                 name.clone()
             };
             view! {
                   <button
-                    class="px-4 py-2 bg-blue-400 text-white font-bold rounded hover:bg-blue-700 focus:outline-none focus:shadow-outline min-w-[200px]"
+                    class="px-4 w-4/5 py-2 bg-blue-400 text-white font-bold rounded hover:bg-blue-700 focus:outline-none focus:shadow-outline min-w-[200px]"
                     on:click=move |ev| {
                       ev.prevent_default();
                       select(select_name.clone());
