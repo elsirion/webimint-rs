@@ -20,7 +20,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["webimint-1717553fc7702d9a.js"]
+      "js": ["webimint-7a7e1d993b4740cd.js"]
     }
   ],
   "__chrome__host_permissions": ["*://*/*"],

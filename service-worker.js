@@ -1,4 +1,4 @@
-var buildVersion = "1717553fc7702d9a"
+var buildVersion = "7a7e1d993b4740cd"
 var cssBuildVersion = "751ba0164fcd3dfd"
 var cacheName = "webimint";
 
