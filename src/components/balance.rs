@@ -34,8 +34,8 @@ pub fn Balance(#[prop(optional, into)] class: String) -> impl IntoView {
 
     view! {
       <div class=class>
-        <h2 class="text-xl leading-tight w-full font-body font-semibold  pb-4 mb-4 text-gray-400 border-b-2 border-gray-200">"Balance"</h2>
-        <h3 class="text-4xl">{balance}</h3>
+        <h2 class="text-lg md:text-xl leading-tight w-full font-body font-semibold md:pb-4 mb-4 text-gray-400 border-b-2 border-gray-200">"Balance"</h2>
+        <h3 class="text-xl md:text-4xl">{balance}</h3>
       </div>
     }
 }

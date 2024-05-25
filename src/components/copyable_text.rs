@@ -36,7 +36,7 @@ pub fn CopyableText(
                         let copy = copy.clone();
                         move |_| copy(text.get().as_str())
                     }
-                    class="w-full py-3 text-xl bg-blue-500 hover:enabled:bg-blue-600
+                    class="w-full py-3 bg-blue-500 hover:enabled:bg-blue-600
                         text-white font-semibold font-body rounded-lg cursor-pointer enabled:ease disabled:opacity-70
                         disabled:cursor-not-allowed hover:enabled:shadow-lg"
                 >

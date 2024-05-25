@@ -2,6 +2,7 @@ pub mod alerts;
 pub mod app;
 pub mod balance;
 pub mod copyable_text;
+pub mod create_wallet;
 pub mod footer;
 pub mod joined;
 pub mod ln_receive_form;

@@ -4,6 +4,7 @@ use leptos_meta::{Link, Meta, Title};
 use tracing::info;
 
 use crate::client::ClientRpc;
+use crate::components::create_wallet::CreateWallet;
 use crate::components::service_worker::ServiceWorker;
 use crate::components::{Footer, Joined, Logo, SubmitForm, WalletSelector};
 use crate::context::provide_client_context;
@@ -72,7 +73,7 @@ pub fn App() -> impl IntoView {
 
       <div class="h-[100dvh]">
         <div class="mx-auto w-full h-full flex flex-col min-w-[400px] lg:max-w-[600px] p-6">
-          <header class="flex justify-center mb-20">
+          <header class="flex justify-center mb-6 md:mb-20">
             <Logo class="bg-red border-1 border-blue"/>
           </header>
           <main class="w-full pb-24 flex-grow ">
@@ -88,6 +89,9 @@ pub fn App() -> impl IntoView {
                           available=wallets
                           on_select=move |wallet_name| select_wallet_action.dispatch(wallet_name)
                         />
+                        <CreateWallet
+                          on_select=move |wallet_name| select_wallet_action.dispatch(wallet_name)
+                        />
                       }.into_view()
                     } else {
                       empty_view().into_view()
@@ -100,7 +104,7 @@ pub fn App() -> impl IntoView {
               when=show_join
                 fallback=|| empty_view()
               >
-              <h1 class="font-heading text-gray-900 text-4xl font-semibold mb-6">"Join a Federation"</h1>
+              <h1 class="font-heading text-gray-900 font-semibold mb-6">"Join a Federation"</h1>
               <SubmitForm
                 description="Enter invite code (i.e. fed11jpr3lgm8t…) to join a Federation".into()
                 on_submit=move |value| join_action.dispatch(value)
@@ -114,7 +118,7 @@ pub fn App() -> impl IntoView {
               when=show_join_error
               fallback=|| empty_view()
             >
-              {move || view!{<div class="text-body text-md mt-4"><span class="text-red-500">{
+              {move || view!{<div class="text-body mt-4"><span class="text-red-500">{
                 format!("✗ Failed to join federation: {:?}", join_action.value().with(|r| {
                   match r {
                     Some(Err(e)) =>anyhow!("{:?}", e),

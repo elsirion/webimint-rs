@@ -29,7 +29,7 @@ pub fn ReceiveEcash() -> impl IntoView {
       {move ||
         if let Some(result) = submit_action.value().get() {
           view!(
-            <div class="text-body text-md mt-4">{
+            <div class="text-body mt-4">{
               match result {
                 Err(error) => view!(<span class="text-red-500">{format!("✗ Failed to redeem e-cash: {error}")}</span>),
                 Ok(value) => view!(<span class="text-green-600">{format!("✓ Redeemed {:?} msat", value.msats)}</span>)
