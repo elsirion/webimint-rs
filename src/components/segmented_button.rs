@@ -50,7 +50,7 @@ where
         .collect::<Vec<_>>();
 
     view! {
-        <div class="bg-white p-1 rounded-full shadow flex w-full">
+        <div class="bg-white p-1 rounded-full shadow flex w-full mb-8">
             {buttons}
         </div>
     }
