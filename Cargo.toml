@@ -28,7 +28,7 @@ hex = "0.4.3"
 itertools = "0.13.0"
 leptos = { version = "0.6.5", features = ["csr"] }
 leptos-use = "0.10.2"
-leptos-qr-scanner = "0.1.0"
+leptos-qr-scanner = "0.1.1"
 leptos_meta = { version = "0.6.5", features = ["csr"] }
 lightning-invoice = { version = "0.26.0", features = [ "serde" ] }
 qrcode-generator = "4.1.8"

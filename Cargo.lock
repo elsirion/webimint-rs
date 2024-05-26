@@ -1876,9 +1876,9 @@ dependencies = [
 
 [[package]]
 name = "leptos-qr-scanner"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4cb8a7741c4ab79c21360058d5a91d3b71b06e00dcf0856115e21b92e3fc1a90"
+checksum = "8087435a61f5b0e0ccc89de3490e88ef91de143e3c09916da6f7b6e30be9665c"
 dependencies = [
  "js-sys",
  "leptos",
