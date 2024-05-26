@@ -61,7 +61,7 @@ where
             set_value.set(invite.clone());
             on_submit(invite);
           }
-          class="my-8"
+          class="my-8 mx-auto flex aspect-square w-4/5"
         />
     };
 
