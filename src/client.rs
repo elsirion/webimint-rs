@@ -3,10 +3,11 @@ use std::str::FromStr;
 use std::time::{Duration, SystemTime};
 
 use fedimint_client::secret::{PlainRootSecretStrategy, RootSecretStrategy};
-use fedimint_client::{Client, FederationInfo};
+use fedimint_client::Client;
 use fedimint_core::api::InviteCode;
+use fedimint_core::config::ClientConfig;
 use fedimint_core::core::OperationId;
-use fedimint_core::db::{IDatabaseTransactionOpsCore, IRawDatabase};
+use fedimint_core::db::{Database, IDatabaseTransactionOpsCore, IRawDatabase};
 use fedimint_core::task::spawn;
 use fedimint_core::util::BoxStream;
 use fedimint_core::Amount;
@@ -18,7 +19,7 @@ use fedimint_mint_client::{
     MintClientInit, MintClientModule, MintOperationMeta, MintOperationMetaVariant, OOBNotes,
 };
 use fedimint_wallet_client::WalletClientInit;
-use futures::StreamExt;
+use futures::{StreamExt, TryFutureExt};
 use leptos::logging::warn;
 use lightning_invoice::{Bolt11Invoice, Bolt11InvoiceDescription};
 use rand::thread_rng;
@@ -94,6 +95,20 @@ impl From<anyhow::Error> for RpcError {
 
 type RpcCall = (RpcRequest, oneshot::Sender<anyhow::Result<RpcResponse>>);
 
+// TODO: use bip39 and proper derivation
+async fn load_or_generate_entropy(db: &Database) -> [u8; 64] {
+    if let Ok(entropy) = Client::load_decodable_client_secret::<[u8; 64]>(db).await {
+        entropy
+    } else {
+        info!("Generating mnemonic and writing entropy to client storage");
+        let entropy = PlainRootSecretStrategy::random(&mut thread_rng());
+        Client::store_encodable_client_secret(db, entropy)
+            .await
+            .expect("DB error");
+        entropy
+    }
+}
+
 async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
     // Open DB
     let (wallet_db, joined) = loop {
@@ -164,33 +179,19 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
                 }
             };
 
-            let mut client_builder = fedimint_client::Client::builder();
-            client_builder.with_database(wallet_db.clone().into());
+            let mut client_builder = fedimint_client::Client::builder(wallet_db.clone().into());
 
-            let client_secret = match client_builder
-                .load_decodable_client_secret::<[u8; 64]>()
-                .await
-            {
-                Ok(secret) => secret,
-                Err(_) => {
-                    info!("Generating secret and writing to client storage");
-                    let secret = PlainRootSecretStrategy::random(&mut thread_rng());
-                    client_builder
-                        .store_encodable_client_secret(secret)
-                        .await
-                        .expect("Failed to store client secret");
-                    secret
-                }
-            };
+            let client_secret = load_or_generate_entropy(client_builder.db()).await;
 
             client_builder.with_module(WalletClientInit(None));
             client_builder.with_module(MintClientInit);
             client_builder.with_module(LightningClientInit);
             client_builder.with_primary_module(1);
-            client_builder
-                .with_federation_info(FederationInfo::from_invite_code(invite_code).await.unwrap());
-            let client_res = client_builder
-                .build(PlainRootSecretStrategy::to_root_secret(&client_secret))
+            let client_res = ClientConfig::download_from_invite_code(&invite_code)
+                .and_then(|cfg| {
+                    client_builder
+                        .join(PlainRootSecretStrategy::to_root_secret(&client_secret), cfg)
+                })
                 .await;
 
             match client_res {
@@ -210,36 +211,47 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
         }
     } else {
         // TODO: dedup
-        let mut client_builder = fedimint_client::Client::builder();
-        client_builder.with_database(wallet_db.into());
+        let mut client_builder = fedimint_client::Client::builder(wallet_db.into());
 
-        let client_secret = match client_builder
-            .load_decodable_client_secret::<[u8; 64]>()
-            .await
-        {
-            Ok(secret) => secret,
-            Err(_) => {
-                info!("Generating secret and writing to client storage");
-                let secret = PlainRootSecretStrategy::random(&mut thread_rng());
-                client_builder
-                    .store_encodable_client_secret(secret)
-                    .await
-                    .expect("Failed to store client secret");
-                secret
-            }
-        };
+        let client_secret = load_or_generate_entropy(client_builder.db()).await;
 
         client_builder.with_module(WalletClientInit(None));
         client_builder.with_module(MintClientInit);
         client_builder.with_module(LightningClientInit);
         client_builder.with_primary_module(1);
         client_builder
-            .build(PlainRootSecretStrategy::to_root_secret(&client_secret))
+            .open(PlainRootSecretStrategy::to_root_secret(&client_secret))
             .await
             .unwrap()
     };
 
     let client: &Client = Box::leak(Box::new(client));
+
+    info!("Client initialized");
+
+    let meta_service = client.meta_service().clone();
+    let db = client.db().clone();
+    spawn("gateway updater", async {
+        client
+            .get_first_module::<LightningClientModule>()
+            .update_gateway_cache_continuously(move |gws| {
+                let db_inner = db.clone();
+                let meta_service_inner = meta_service.clone();
+                async move {
+                    let vetted_gateways = meta_service_inner
+                        .get_field::<Vec<secp256k1_zkp::PublicKey>>(&db_inner, "vetted_gateways")
+                        .await
+                        .and_then(|meta_field| meta_field.value)
+                        .unwrap_or_default();
+                    gws.into_iter()
+                        .filter(|gw| vetted_gateways.contains(&gw.info.gateway_id))
+                        .collect()
+                }
+            })
+            .await
+    });
+
+    info!("Started gateway update service");
 
     while let Some((rpc_request, response_sender)) = rpc.recv().await {
         debug!("Received RPC request: {:?}", rpc_request);
@@ -263,7 +275,7 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
 
                 let response = client
                     .get_first_module::<MintClientModule>()
-                    .spend_notes(amount, TRY_CANCEL_AFTER, ())
+                    .spend_notes(amount, TRY_CANCEL_AFTER, false, ())
                     .await
                     .map(|(_, notes)| RpcResponse::EcashSend(notes));
 
@@ -301,11 +313,17 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
                     }
                 };
 
+                let gateway = client
+                    .get_first_module::<LightningClientModule>()
+                    .list_gateways()
+                    .await
+                    .first()
+                    .map(|gw| gw.info.clone());
                 let _ = response_sender
                     .send(
                         client
                             .get_first_module::<LightningClientModule>()
-                            .pay_bolt11_invoice(invoice, ())
+                            .pay_bolt11_invoice(gateway, invoice, ())
                             .await
                             .map(|_| RpcResponse::LnSend),
                     )
@@ -315,9 +333,24 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
                 amount,
                 description,
             } => {
-                let (operation_id, invoice) = match client
+                let gateway = client
                     .get_first_module::<LightningClientModule>()
-                    .create_bolt11_invoice(amount, description, None, ())
+                    .list_gateways()
+                    .await
+                    .first()
+                    .map(|gw| gw.info.clone());
+                let (operation_id, invoice, _) = match client
+                    .get_first_module::<LightningClientModule>()
+                    .create_bolt11_invoice(
+                        amount,
+                        Bolt11InvoiceDescription::Direct(
+                            &lightning_invoice::Description::new(description)
+                                .expect("FIXME: handle invalid descriptions"),
+                        ),
+                        None,
+                        (),
+                        gateway,
+                    )
                     .await
                 {
                     Ok(res) => res,
@@ -402,6 +435,9 @@ async fn run_client(mut rpc: mpsc::Receiver<RpcCall>) {
                                     };
 
                                     (amount, description)
+                                }
+                                LightningOperationMetaVariant::Claim { .. } => {
+                                    panic!("We'll never generate such operations")
                                 }
                             },
                             _ => panic!("Unsupported module"),
